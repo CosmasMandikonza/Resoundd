@@ -1,5 +1,10 @@
-import type { ReactNode } from "react";
-import { useResound, type Metric } from "@/context/useResound";
+import { useEffect, useState, type ReactNode } from "react";
+import {
+  useResound,
+  type Metric,
+  type View,
+} from "@/context/useResound";
+import FidelityView from "@/components/FidelityView";
 
 interface HudFrameProps {
   children?: ReactNode;
@@ -8,6 +13,20 @@ interface HudFrameProps {
 }
 
 const METRICS: Metric[] = ["meaning", "emotion", "culture", "singability"];
+
+const MENU_ITEMS: { view: View; label: string }[] = [
+  { view: "cast", label: "MEANING-CAST" },
+  { view: "fidelity", label: "FIDELITY" },
+  { view: "rebirth", label: "REBIRTH" },
+  { view: "world", label: "WORLD" },
+];
+
+const GRID_STYLE = {
+  backgroundColor: "var(--void)",
+  backgroundImage:
+    "linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px)",
+  backgroundSize: "64px 64px",
+} as const;
 
 function HudButton({
   label,
@@ -28,6 +47,72 @@ function HudButton({
   );
 }
 
+function MenuOverlay({
+  current,
+  accent,
+  onSelect,
+  onClose,
+}: {
+  current: View;
+  accent: string;
+  onSelect: (view: View) => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-center"
+      style={GRID_STYLE}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Navigation"
+    >
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Close menu"
+        className="absolute right-6 top-4 border border-line bg-transparent px-3 py-1.5 font-mono text-xs uppercase tracking-[0.16em] text-text-dim transition-colors duration-[280ms] hover:bg-surface-2 hover:text-text"
+        style={{ borderRadius: 2, transitionTimingFunction: "var(--ease)" }}
+      >
+        Close
+      </button>
+
+      <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-4 px-6 font-mono text-xl uppercase tracking-[0.2em]">
+        {MENU_ITEMS.map((item, i) => {
+          const isActive = item.view === current;
+          return (
+            <span key={item.view} className="flex items-center gap-5">
+              <button
+                type="button"
+                onClick={() => onSelect(item.view)}
+                className="bg-transparent uppercase tracking-[0.2em] transition-colors duration-[280ms] hover:text-text"
+                style={{
+                  color: isActive ? accent : "var(--text-faint)",
+                  transitionTimingFunction: "var(--ease)",
+                }}
+              >
+                {item.label}
+              </button>
+              {i < MENU_ITEMS.length - 1 && (
+                <span className="text-text-faint" aria-hidden>
+                  ·
+                </span>
+              )}
+            </span>
+          );
+        })}
+      </nav>
+    </div>
+  );
+}
+
 export function HudFrame({ children, activeMetric }: HudFrameProps) {
   const {
     activeAccent,
@@ -35,9 +120,22 @@ export function HudFrame({ children, activeMetric }: HudFrameProps) {
     isPlaying,
     togglePlaying,
     activeMetric: ctxMetric,
+    setActiveMetric,
+    view,
+    setView,
   } = useResound();
 
+  const [menuOpen, setMenuOpen] = useState(false);
   const currentMetric = activeMetric ?? ctxMetric;
+
+  const renderView = () => {
+    switch (view) {
+      case "fidelity":
+        return <FidelityView />;
+      default:
+        return children ?? null;
+    }
+  };
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-void text-text">
@@ -45,23 +143,16 @@ export function HudFrame({ children, activeMetric }: HudFrameProps) {
       <div
         aria-hidden
         className="pointer-events-none fixed inset-0 z-0"
-        style={{
-          backgroundColor: "var(--void)",
-          backgroundImage:
-            "linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px)",
-          backgroundSize: "64px 64px",
-        }}
+        style={GRID_STYLE}
       />
 
       {/* TOP CHROME */}
-      <header className="fixed inset-x-0 top-0 z-20 flex items-center justify-between px-6 py-4">
+      <header className="fixed inset-x-0 top-0 z-30 flex items-center justify-between px-6 py-4">
         {/* Top-left: timecode + status square */}
         <div className="flex items-center gap-3">
           <span
             className="h-2 w-2 shrink-0"
-            style={{
-              backgroundColor: activeAccent,
-            }}
+            style={{ backgroundColor: activeAccent }}
           >
             {isPlaying && (
               <span
@@ -88,32 +179,37 @@ export function HudFrame({ children, activeMetric }: HudFrameProps) {
             label={isPlaying ? "Pause" : "Play"}
             onClick={togglePlaying}
           />
-          <HudButton label="Menu" />
+          <HudButton label="Menu" onClick={() => setMenuOpen(true)} />
         </div>
       </header>
 
-      {/* CONTENT — the empty void shell for now */}
-      <main className="relative z-10 min-h-screen w-full">{children}</main>
+      {/* CONTENT */}
+      <main className="relative z-10 min-h-screen w-full">{renderView()}</main>
 
       {/* BOTTOM CHROME */}
-      <footer className="fixed inset-x-0 bottom-0 z-20 flex items-center justify-between px-6 py-4">
+      <footer className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between px-6 py-4">
         {/* Bottom-left: resonance readout */}
         <span className="font-mono text-xs uppercase tracking-[0.12em] text-text-faint">
           RESONANCE 00.0%
         </span>
 
-        {/* Bottom-center: metric state row */}
+        {/* Bottom-center: interactive metric state row */}
         <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-3 font-mono text-xs uppercase tracking-[0.16em]">
           {METRICS.map((metric, i) => {
             const isActive = metric === currentMetric;
             return (
               <span key={metric} className="flex items-center gap-3">
-                <span
-                  style={isActive ? { color: activeAccent } : undefined}
-                  className={isActive ? "" : "text-text-faint"}
+                <button
+                  type="button"
+                  onClick={() => setActiveMetric(metric)}
+                  className="bg-transparent uppercase tracking-[0.16em] transition-colors duration-[280ms] hover:text-text"
+                  style={{
+                    color: isActive ? activeAccent : "var(--text-faint)",
+                    transitionTimingFunction: "var(--ease)",
+                  }}
                 >
                   {metric}
-                </span>
+                </button>
                 {i < METRICS.length - 1 && (
                   <span className="text-text-faint" aria-hidden>
                     ·
@@ -125,10 +221,25 @@ export function HudFrame({ children, activeMetric }: HudFrameProps) {
         </div>
 
         {/* Bottom-right spacer to balance the readout. */}
-        <span className="font-mono text-xs uppercase tracking-[0.12em] text-text-faint opacity-0">
+        <span
+          aria-hidden
+          className="font-mono text-xs uppercase tracking-[0.12em] text-text-faint opacity-0"
+        >
           RESONANCE 00.0%
         </span>
       </footer>
+
+      {menuOpen && (
+        <MenuOverlay
+          current={view}
+          accent={activeAccent}
+          onSelect={(v) => {
+            setView(v);
+            setMenuOpen(false);
+          }}
+          onClose={() => setMenuOpen(false)}
+        />
+      )}
     </div>
   );
 }

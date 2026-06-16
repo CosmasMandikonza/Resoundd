@@ -1,0 +1,26 @@
+Build the "Fidelity" view (the Loss Map), using ONLY src/fixtures/showcase.ts and the Prompt-1 design tokens/fonts. Do not wire APIs.
+
+NAVIGATION FIRST: add a `view` field to the useResound context: 'cast' | 'fidelity' | 'rebirth' | 'world', default 'cast'. Wire the existing MENU button (top-right) to open a minimal full-screen overlay on var(--void) with the grid behind it, listing four items in Space Mono, uppercase, letter-spacing 0.2em: MEANING-CAST · FIDELITY · REBIRTH · WORLD. Clicking one sets `view` and closes the overlay. The current view is shown in the active accent, others in var(--text-faint). Do NOT use a URL router. Render the Meaning-Cast when view==='cast' and the new Fidelity view when view==='fidelity'.
+
+THE FIDELITY VIEW (instrument layout, grid behind, inside HudFrame):
+- Header strip: song title (Instrument Serif) + artist and "ES → EN" (Space Grotesk, var(--text-dim)). To the right, four readouts from fixture.overallFidelity in Space Mono: MEANING / EMOTION / CULTURE / SINGABILITY, each a 0-100 number with a thin horizontal bar beneath (filled in the accent for that line's dominant emotion-set; use var(--joy) for the header bars).
+- THE LOSS MAP: render fixture.lines as a vertical list of rows. Each row:
+  * A left vertical SATURATION BAR (4px wide) whose color = that line's emotion accent at full saturation when fidelity.meaning is high, lerping toward var(--drained) as it drops. This is the "color draining out = lost meaning" mechanic.
+  * The source line in Instrument Serif (var(--text)); the translation beneath in Space Grotesk (var(--text-dim)).
+  * A tiny Space Mono fidelity number on the right (the currently-selected metric's score for that line).
+  * If line.risk exists, a small square dot in var(--risk) at the row's right edge — var(--risk) appears NOWHERE else.
+- METRIC TABS DRIVE THE MAP: the bottom-center HUD row (MEANING · EMOTION · CULTURE · SINGABILITY) becomes interactive here. Clicking a metric sets it active (in the accent) and re-colors every saturation bar and re-labels every row's number to that metric's sub-score. Default: MEANING.
+- CLICK TO EXPAND (the "What's Lost" panel): clicking a row expands an inline panel beneath it (smooth height transition, 320ms, the easing from Prompt 1) on var(--surface) with a 1px var(--line) border, radius 2px, containing:
+  * The four sub-scores as small labeled Space Mono bars.
+  * line.lost shown as a prose note in Space Grotesk var(--text), prefixed "LOST:" in mono.
+  * EVIDENCE (this is what makes the scores look earned, not vibes): show two grounded readouts in Space Mono — "BACK-TRANSLATION DRIFT: 0.XX" (derive a plausible 0-1 number from 1 - meaning/100) and "ARC DEVIATION: 0.XX" (from 1 - emotion/100). Label them as the measurable basis for Meaning and Emotion fidelity.
+  * If line.risk exists, a panel section headed "CROSS-CULTURAL RISK" in var(--risk) with line.risk text.
+  Only one row expanded at a time.
+
+EDGE CASES:
+- Guard against empty fixture.lines and missing fidelity sub-fields (default to 0, don't crash).
+- Rows without lost/risk simply omit those sections.
+- Keyboard: rows are focusable and expand on Enter/Space; overlay closes on Escape.
+- The saturation-bar color must recompute live when the active metric changes.
+
+Build, run, open MENU → FIDELITY, and show me the Loss Map with one row expanded.
