@@ -1,0 +1,29 @@
+Build the foundation for a web app called "Resound". Do ONLY what's described here; do not scaffold extra pages or features yet.
+
+STACK: Vite + React + TypeScript + Tailwind CSS. Add a minimal Express server (server/index.ts) that (a) serves the built frontend and (b) will later proxy third-party APIs. Use Replit Secrets for any keys (none needed yet). Pin dependency versions.
+
+DESIGN SYSTEM — implement as CSS variables in src/styles/tokens.css and map them into tailwind.config. Use ONLY these tokens everywhere; never use Tailwind default palette classes.
+[paste the full palette block above]
+FONTS — load from Google Fonts via <link> in index.html with preconnect: "Instrument Serif" (display), "Space Grotesk" (UI/body, weights 300-700), "Space Mono" (data/HUD, 400/700). Set font-display: swap. Body defaults to Space Grotesk. NEVER use Inter, Roboto, Arial, or system-ui.
+SPACING: 8px scale (4,8,12,16,24,32,48,64,96,128).
+MOTION: default easing cubic-bezier(0.22,1,0.36,1), 280-600ms. Nothing bouncy.
+
+GLOBAL CHROME — build a persistent <HudFrame> component wrapping all pages:
+- Fixed graph-paper grid background: 64px cells drawn with var(--line), behind all content, on var(--void).
+- Top-left: a monospace timecode readout (Space Mono, uppercase, letter-spacing 0.12em) + a small 8px status square in the active accent that pulses when "playing".
+- Top-center: small "RESOUND" wordmark (Space Grotesk, letter-spacing 0.2em).
+- Top-right: PLAY/PAUSE and MENU as mono uppercase letter-spaced buttons with a 1px var(--line) border, fill to var(--surface-2) on hover. No gradients, no pills, radius 2px.
+- Bottom-left: a mono "resonance readout" placeholder (e.g., "RESONANCE 00.0%").
+- Bottom-center: a mono state row of four tabs: MEANING · EMOTION · CULTURE · SINGABILITY. Inactive tabs use var(--text-faint); the active one uses the active accent. Make the active tab a prop.
+- Expose a React context "useResound" holding: activeAccent (one of the emotion tokens), timecode, isPlaying, activeMetric. Default activeAccent to var(--joy).
+
+DATA CONTRACT — create src/types.ts with these exact types (this is the contract for the whole app):
+  type Emotion = 'joy'|'heat'|'love'|'calm'|'melancholy';
+  interface Line { id: string; tStart: number; tEnd: number; source: string; translation: string; emotion: Emotion; fidelity: { meaning: number; emotion: number; culture: number; singability: number }; lost?: string; risk?: string; }
+  interface ArcPoint { t: number; valence: number; intensity: number; emotion: Emotion }   // 0..1
+  interface Fingerprint { sourceArc: ArcPoint[]; translationArc: ArcPoint[] }
+  interface Song { id: string; title: string; artist: string; sourceLang: string; targetLang: string; market: string; previewUrl: string; previewOffsetMs: number; durationMs: number; lines: Line[]; fingerprint: Fingerprint; overallFidelity: { meaning: number; emotion: number; culture: number; singability: number } }
+
+FIXTURE — create src/fixtures/showcase.ts exporting ONE realistic Song for a Spanish→English crossover track (e.g., a Bad Bunny–style song). Author ~12 lines with plausible source + flat English translation, an emotion per line, fidelity sub-scores (some high, some clearly drained), and 2 lines flagged with `lost` and one with `risk`. Build ~40 ArcPoints for each arc where the translation arc visibly flattens where fidelity is low. Use a placeholder previewUrl for now. This fixture powers all UI until APIs are wired.
+
+A11y: ensure focus states use var(--line-bright). Build, run, and show me the empty Hud shell on var(--void) with the grid and all readouts. No other screens yet.

@@ -1,6 +1,6 @@
-# [Project name]
+# Resound
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A music-translation instrument that visualizes how much meaning, emotion, culture, and singability survive when a song crosses languages.
 
 ## Run & Operate
 

@@ -1,0 +1,71 @@
+@import "tailwindcss";
+@import "./styles/tokens.css";
+
+/* Map the Resound tokens into the Tailwind theme so utilities like
+ * bg-void, text-text, border-line, text-joy, font-mono, etc. resolve to
+ * the CSS variables defined in styles/tokens.css. */
+@theme inline {
+  --color-void: var(--void);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-line-bright: var(--line-bright);
+  --color-text: var(--text);
+  --color-text-dim: var(--text-dim);
+  --color-text-faint: var(--text-faint);
+
+  --color-joy: var(--joy);
+  --color-heat: var(--heat);
+  --color-love: var(--love);
+  --color-calm: var(--calm);
+  --color-melancholy: var(--melancholy);
+
+  --color-drained: var(--drained);
+  --color-risk: var(--risk);
+
+  --color-accent: var(--accent);
+
+  --font-serif: "Instrument Serif", Georgia, serif;
+  --font-sans: "Space Grotesk", sans-serif;
+  --font-mono: "Space Mono", monospace;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--void);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* A11y: focus states use the bright hairline token. */
+  :focus-visible {
+    outline: 2px solid var(--line-bright);
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  @keyframes hudPulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.2;
+    }
+  }
+
+  .hud-pulse {
+    animation: hudPulse 1.2s var(--ease) infinite;
+  }
+}

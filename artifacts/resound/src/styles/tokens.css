@@ -1,0 +1,46 @@
+/* RESOUND DESIGN TOKENS
+ * Source of truth for the whole app. Use ONLY these tokens; never use
+ * Tailwind default palette classes. Mapped into the Tailwind theme in index.css.
+ */
+
+:root {
+  /* CORE — the instrument void */
+  --void: #001209; /* app background, the instrument void */
+  --surface: #04160c; /* panels, the HUD frame */
+  --surface-2: #0a2014; /* hover / active panel */
+  --line: rgba(208, 190, 182, 0.08); /* grid + hairlines */
+  --line-bright: rgba(208, 190, 182, 0.2); /* active hairlines, playhead */
+  --text: #d0beb6; /* primary foreground (warm taupe) */
+  --text-dim: #8e837b; /* secondary */
+  --text-faint: #5a534d; /* tertiary / inactive labels */
+
+  /* EMOTION ACCENTS — the shifting signature (one is active at a time) */
+  --joy: #e8a33d; /* amber-gold  (joy, triumph) */
+  --heat: #f2683c; /* warm orange (defiance, heat, energy) */
+  --love: #d96ba6; /* rose-magenta (love, tenderness) */
+  --calm: #7fb6a1; /* sage-mint (calm, peace) */
+  --melancholy: #5e9fcb; /* cool blue (sadness, longing) */
+
+  --drained: #4a4742; /* grey-taupe = THE COLOR OF LOST MEANING */
+  --risk: #ff4d4d; /* sharp coral — RESERVED only for cross-cultural risk */
+
+  /* SPACING — 8px scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-24: 96px;
+  --space-32: 128px;
+
+  /* MOTION */
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-fast: 280ms;
+  --dur-slow: 600ms;
+
+  /* The currently active emotion accent. Defaults to joy. */
+  --accent: var(--joy);
+}
