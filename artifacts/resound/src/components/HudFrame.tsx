@@ -5,6 +5,8 @@ import {
   type View,
 } from "@/context/useResound";
 import FidelityView from "@/components/FidelityView";
+import CastView from "@/components/CastView";
+import { clamp01 } from "@/lib/colors";
 
 interface HudFrameProps {
   children?: ReactNode;
@@ -123,13 +125,19 @@ export function HudFrame({ children, activeMetric }: HudFrameProps) {
     setActiveMetric,
     view,
     setView,
+    resonance,
   } = useResound();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const currentMetric = activeMetric ?? ctxMetric;
+  const resonanceLabel = `RESONANCE ${(clamp01(resonance) * 100)
+    .toFixed(1)
+    .padStart(4, "0")}%`;
 
   const renderView = () => {
     switch (view) {
+      case "cast":
+        return <CastView />;
       case "fidelity":
         return <FidelityView />;
       default:
@@ -190,7 +198,7 @@ export function HudFrame({ children, activeMetric }: HudFrameProps) {
       <footer className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between px-6 py-4">
         {/* Bottom-left: resonance readout */}
         <span className="font-mono text-xs uppercase tracking-[0.12em] text-text-faint">
-          RESONANCE 00.0%
+          {resonanceLabel}
         </span>
 
         {/* Bottom-center: interactive metric state row */}
@@ -225,7 +233,7 @@ export function HudFrame({ children, activeMetric }: HudFrameProps) {
           aria-hidden
           className="font-mono text-xs uppercase tracking-[0.12em] text-text-faint opacity-0"
         >
-          RESONANCE 00.0%
+          {resonanceLabel}
         </span>
       </footer>
 

@@ -2,58 +2,16 @@ import { useMemo, useState } from "react";
 import { useResound, type Metric } from "@/context/useResound";
 import showcaseSong from "@/fixtures/showcase";
 import type { Emotion, Line } from "@/types";
-
-/** Map each emotion to its CSS custom property (source of truth: tokens.css). */
-const EMOTION_VAR: Record<Emotion, string> = {
-  joy: "--joy",
-  heat: "--heat",
-  love: "--love",
-  calm: "--calm",
-  melancholy: "--melancholy",
-};
-
-/** Fallbacks used only before the DOM is available; tokens.css remains authoritative. */
-const EMOTION_FALLBACK: Record<Emotion, string> = {
-  joy: "#e8a33d",
-  heat: "#f2683c",
-  love: "#d96ba6",
-  calm: "#7fb6a1",
-  melancholy: "#5e9fcb",
-};
-const DRAINED_FALLBACK = "#4a4742";
-
-function readCssVar(name: string, fallback: string): string {
-  if (typeof window === "undefined") return fallback;
-  const value = getComputedStyle(document.documentElement)
-    .getPropertyValue(name)
-    .trim();
-  return value || fallback;
-}
+import {
+  clamp01,
+  lerpColor,
+  resolveDrained,
+  resolveEmotionColor,
+} from "@/lib/colors";
 
 type Palette = { emotion: Record<Emotion, string>; drained: string };
 
 const METRICS: Metric[] = ["meaning", "emotion", "culture", "singability"];
-
-function clamp01(n: number): number {
-  return Math.max(0, Math.min(1, n));
-}
-
-function hexToRgb(hex: string): [number, number, number] {
-  const h = hex.replace("#", "");
-  return [
-    parseInt(h.slice(0, 2), 16),
-    parseInt(h.slice(2, 4), 16),
-    parseInt(h.slice(4, 6), 16),
-  ];
-}
-
-function lerpColor(from: string, to: string, t: number): string {
-  const a = hexToRgb(from);
-  const b = hexToRgb(to);
-  const k = clamp01(t);
-  const c = a.map((v, i) => Math.round(v + (b[i] - v) * k));
-  return `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
-}
 
 /** Safely read a fidelity sub-score (0..1), defaulting to 0. */
 function fidelityScore(line: Line, metric: Metric): number {
@@ -263,16 +221,13 @@ export function FidelityView() {
   const palette = useMemo<Palette>(
     () => ({
       emotion: {
-        joy: readCssVar(EMOTION_VAR.joy, EMOTION_FALLBACK.joy),
-        heat: readCssVar(EMOTION_VAR.heat, EMOTION_FALLBACK.heat),
-        love: readCssVar(EMOTION_VAR.love, EMOTION_FALLBACK.love),
-        calm: readCssVar(EMOTION_VAR.calm, EMOTION_FALLBACK.calm),
-        melancholy: readCssVar(
-          EMOTION_VAR.melancholy,
-          EMOTION_FALLBACK.melancholy,
-        ),
+        joy: resolveEmotionColor("joy"),
+        heat: resolveEmotionColor("heat"),
+        love: resolveEmotionColor("love"),
+        calm: resolveEmotionColor("calm"),
+        melancholy: resolveEmotionColor("melancholy"),
       },
-      drained: readCssVar("--drained", DRAINED_FALLBACK),
+      drained: resolveDrained(),
     }),
     [],
   );

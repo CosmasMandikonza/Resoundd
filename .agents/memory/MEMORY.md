@@ -1,0 +1,1 @@
+- [WebGL/R3F sandbox fallback](webgl-sandbox-fallback.md) — screenshot env has no WebGL; gate any react-three-fiber Canvas with detectWebGL + error-boundary CSS fallback, or screenshots crash.

@@ -2,9 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
-  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -29,8 +27,9 @@ interface ResoundContextValue {
   /** The emotion currently driving the accent. */
   activeEmotion: Emotion;
   setActiveEmotion: (emotion: Emotion) => void;
-  /** Monospace timecode readout, e.g. "00:00:00:00". */
+  /** Monospace timecode readout, e.g. "00:00:000". Driven by the active view. */
   timecode: string;
+  setTimecode: (timecode: string) => void;
   isPlaying: boolean;
   togglePlaying: () => void;
   setIsPlaying: (playing: boolean) => void;
@@ -40,38 +39,20 @@ interface ResoundContextValue {
   /** Which top-level view is active. */
   view: View;
   setView: (view: View) => void;
+  /** Resonance readout, 0..1 (defaults to 0). Shown bottom-left in the HUD. */
+  resonance: number;
+  setResonance: (value: number) => void;
 }
 
 const ResoundContext = createContext<ResoundContextValue | null>(null);
 
-const FPS = 30;
-
-function formatTimecode(frames: number): string {
-  const ff = frames % FPS;
-  const totalSeconds = Math.floor(frames / FPS);
-  const ss = totalSeconds % 60;
-  const mm = Math.floor(totalSeconds / 60) % 60;
-  const hh = Math.floor(totalSeconds / 3600);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${pad(hh)}:${pad(mm)}:${pad(ss)}:${pad(ff)}`;
-}
-
 export function ResoundProvider({ children }: { children: ReactNode }) {
   const [activeEmotion, setActiveEmotion] = useState<Emotion>("joy");
   const [isPlaying, setIsPlaying] = useState(false);
-  const [timecode, setTimecode] = useState("00:00:00:00");
+  const [timecode, setTimecode] = useState("00:00:000");
   const [activeMetric, setActiveMetric] = useState<Metric>("meaning");
   const [view, setView] = useState<View>("cast");
-  const framesRef = useRef(0);
-
-  useEffect(() => {
-    if (!isPlaying) return;
-    const id = window.setInterval(() => {
-      framesRef.current += 1;
-      setTimecode(formatTimecode(framesRef.current));
-    }, 1000 / FPS);
-    return () => window.clearInterval(id);
-  }, [isPlaying]);
+  const [resonance, setResonance] = useState(0);
 
   const togglePlaying = useCallback(() => setIsPlaying((p) => !p), []);
 
@@ -81,6 +62,7 @@ export function ResoundProvider({ children }: { children: ReactNode }) {
       activeEmotion,
       setActiveEmotion,
       timecode,
+      setTimecode,
       isPlaying,
       togglePlaying,
       setIsPlaying,
@@ -88,8 +70,18 @@ export function ResoundProvider({ children }: { children: ReactNode }) {
       setActiveMetric,
       view,
       setView,
+      resonance,
+      setResonance,
     }),
-    [activeEmotion, timecode, isPlaying, togglePlaying, activeMetric, view],
+    [
+      activeEmotion,
+      timecode,
+      isPlaying,
+      togglePlaying,
+      activeMetric,
+      view,
+      resonance,
+    ],
   );
 
   return (

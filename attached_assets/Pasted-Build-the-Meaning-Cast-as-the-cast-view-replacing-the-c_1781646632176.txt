@@ -1,0 +1,24 @@
+Build the Meaning-Cast as the `cast` view, replacing the current empty shell. Render it when useResound view==='cast'. Use ONLY src/fixtures/showcase.ts, the Prompt-1 tokens/fonts, and the existing runtime CSS-variable color helper (do not hardcode hex). Do not touch the Fidelity view or wire any APIs.
+
+LAYOUT (full-bleed on var(--void), grid behind, inside HudFrame, asymmetric instrument style):
+
+1) THE RESONANCE FINGERPRINT — top ~55% of viewport. Use three + @react-three/fiber (pin versions). A group of THREE SphereGeometry meshes: one large central sphere (the source song) flanked left and right by two smaller spheres (the two target markets). 
+   - COLOR WASH via CanvasTexture (NOT a GLSL shader, to avoid shader-compile bugs): for each sphere, draw onto an offscreen 2D canvas a vertical gradient — the current emotion's accent color at the top fading to near-black (var(--void)) at the bottom — plus a stepped/blocky horizontal "glitch" band across the middle third (alternating darker rectangles, like Hertzwerk's pixelated equator). Map that canvas as the sphere's material map. When the active emotion changes, lerp the top gradient color over 500ms and set texture.needsUpdate=true.
+   - The central sphere's emotion = the emotion of the current line at the playhead. Each FLANK sphere's wash desaturates its top color toward var(--drained) in proportion to (1 - that market's average meaning fidelity); for the fixture, derive two market fidelities from the line scores so the flanks visibly differ.
+   - Slow idle rotation of the whole group (about 0.1 rad/s). Soft ambient + one directional light.
+   - DRIVE timing from the <audio> element's currentTime mapped onto the fixture timeline — never Web Audio FFT.
+   - PERFORMANCE/EDGE: cap renderer pixelRatio at 2; one requestAnimationFrame loop; dispose geometries, materials, and textures on unmount; handle window resize so the canvas never stretches.
+
+2) THE HARMONIC ARCS — bottom ~45%, an SVG over the grid. Plot two thin curves left→right across the song timeline from fixture.fingerprint: the sourceArc (stroke = its emotion accent) and the translationArc (stroke = its accent, desaturated toward var(--drained) where fidelity drops). Lightly shade the area between them where they diverge. Animate both curves drawing on via stroke-dashoffset on mount (~900ms, Prompt-1 easing). Place Space-Mono tick marks at each line's tStart. A vertical playhead line (var(--line-bright)) with a small Space-Mono MM:SS:mmm timecode sweeps across as audio plays.
+   Beneath the arcs, show the CURRENT LINE: source in Instrument Serif (var(--text)), translation under it in Space Grotesk (var(--text-dim)); if the current line has `lost`, show it as a small Space-Mono note prefixed "LOST:" in the current accent.
+
+3) THE BORDER SLIDER — a draggable vertical hairline over the arcs. Left of it = source state; dragging it right progressively reveals/wipes in the translation arc and drains its color in real time. Pointer- and keyboard-accessible (arrow keys move it).
+
+PLAYBACK & HUD SYNC: an <audio> element using fixture.previewUrl. A central PLAY control (reuse the HUD button style) starts playback ONLY on user click (autoplay policy). On play, update context every frame: isPlaying=true, timecode formatted MM:SS:mmm, and activeAccent = current line's emotion. The HUD timecode, pulsing status square, bottom-left RESONANCE readout (= fixture.overallFidelity.meaning), and bottom-center metric row all already read context, so they update automatically.
+
+EDGE CASES (handle now):
+- fixture.previewUrl is currently a placeholder, so the audio will fail to load. On load error OR missing url, advance a SYNTHETIC CLOCK via requestAnimationFrame so the Fingerprint, arcs, playhead, and HUD timecode all still animate with no audio, and show a small Space-Mono note "NO PREVIEW — FOLLOW-ALONG MODE". Never crash. (This becomes real audio once the backend is wired.)
+- Guard all arc/line lookups against empty arrays.
+- Clean up the audio element, GSAP/CSS animations, and the RAF loop on unmount.
+
+Build, run on the default cast view, click PLAY, and show me the Meaning-Cast animating in follow-along mode with the playhead sweeping and the accent shifting per line.
