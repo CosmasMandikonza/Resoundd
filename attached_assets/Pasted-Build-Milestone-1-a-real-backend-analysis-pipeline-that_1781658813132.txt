@@ -1,0 +1,34 @@
+Build Milestone 1: a real backend analysis pipeline that lets a user analyze ANY song, behind the EXISTING data contract (types.ts). Keep all four fixture-based views working unchanged — they will now also render LIVE data fed through the same context. Do not rewrite the views' rendering.
+
+ARCHITECTURE:
+- Move the TypeScript types into a shared module imported by BOTH the Express server and the React client (single source of truth for Song/Line/Fingerprint/Market).
+- ALL third-party calls happen in Express, reading keys from process.env (Replit Secrets). The browser NEVER holds a key or calls a partner directly. Pin all new deps.
+
+ENDPOINT: POST /api/analyze  body: { query?: string, title?: string, artist?: string, targetLang: string }  → returns a Song matching the contract exactly. Pipeline, with the listed failure handling:
+
+1) RESOLVE TRACK (Musixmatch). Prefer matcher.track.get with artist+title; else track.search with query. ALWAYS read message.header.status_code from the JSON envelope, not just the HTTP code. From the chosen track capture commontrack_id/track_id, track_name, artist_name, has_lyrics, has_subtitles, has_richsync, track_isrc. Pick a result where has_lyrics=1. If status_code 401 → return {error:'auth'}; 404/no match → {error:'not_found'}.
+
+2) FETCH LYRICS (track.lyrics.get). Read lyrics_body. DETECT TIER/TRUNCATION: if status_code is 402, or lyrics_body contains the commercial-use disclaimer / "*** This Lyrics is NOT for Commercial use ***" / a "...(70%)" style cutoff, set song.lyricsRestricted=true and proceed with whatever lines are present. STRIP the disclaimer line before use. Split into lines (drop empties). COMPLIANCE: never write raw lyrics to disk or a database; treat them as request-scoped only.
+
+3) TIMING — fallback chain. Try track.richsync.get (word/syllable). If status_code 402/401/empty → try track.subtitles.get (line-level). If both fail → none. Set song-level timingLevel:'word'|'line'|'none'. Build each line's tStart/tEnd from the timing if present; if 'none', distribute evenly across the preview duration (or a 30000ms default). Word-level timestamps, when present, are full-track times.
+
+4) TRANSLATION. Try track.lyrics.translation.get with selected_language=targetLang. If it returns text → translationSource:'official'. If empty/unavailable → translationSource:'generated' and have the LLM translate (literal, faithful baseline) so analysis can proceed for any language.
+
+5) PREVIEW AUDIO (server-proxied iTunes Search): GET https://itunes.apple.com/search?term=<artist title>&media=music&entity=song&limit=8. Pick the best match by artist+title similarity, EXCLUDING results whose name/collection contains "karaoke","tribute","cover","made famous". Capture previewUrl + trackTimeMillis. If none has a previewUrl → previewUrl:null. The client will play previewUrl directly in an <audio> element (cross-origin media playback is fine); do NOT route the audio bytes through the server.
+
+6) LLM ANALYSIS (the core). ONE structured call, temperature 0, using the provider in LLM_PROVIDER via JSON-mode / tool-use with a STRICT schema. Input: sourceLang, targetLang, the array of {source, translation} lines. Output JSON for every line: { localized (faithful + singable target rendering), emotion (one of joy|heat|love|calm|melancholy), fidelity{meaning,emotion,culture,singability} 0-100, rebornFidelity{...} 0-100, lost? (one-sentence note when meaning/culture is degraded), risk? (cross-cultural risk note when applicable) }, PLUS overallFidelity, PLUS singability{syllableSource,syllableLocalized,rhyme,stressMatch}, PLUS fingerprint.sourceArc and fingerprint.translationArc as ~40 {t,valence,intensity,emotion} points where the translation arc visibly dips on low-fidelity lines. Validate the parsed JSON against the schema; on parse failure, retry once with a "return only valid JSON" reminder; if it still fails, return {error:'analysis'}. Cap and time-box the call.
+
+7) GROUNDED DRIFT (real, defensible). For each line, have the LLM also back-translate the target line to the source language. Then call an embeddings model (OpenAI text-embedding-3-small if OPENAI_API_KEY set) on [source line, back-translated line] pairs (batch all lines in one request) and compute cosine distance → line.drift (0-1). If no embeddings key, set line.drift = 1 - meaning/100. Surface drift in the Fidelity view's EVIDENCE readout (replace the derived value with this real one).
+
+8) ASSEMBLE + CACHE. Build the Song (id, title, artist, sourceLang, targetLang, market, previewUrl, previewOffsetMs:0, durationMs, lines, fingerprint, overallFidelity, singability, lyricsRestricted, timingLevel, translationSource). Keep an in-memory Map cache keyed `${trackId}:${targetLang}` so repeat analyses skip the LLM. (In-memory request cache only — no persistent lyrics store.)
+
+FRONTEND:
+- Add an "ANALYZE A SONG" entry in the MENU overlay: a text input (song + artist) and a target-language <select> (EN, ES, PT, FR, DE, IT, JA, KO). Submit → POST /api/analyze. Keep the showcase fixtures as quick-pick buttons there ("TRY: <title>").
+- LOADING STATE (instrument style, on var(--void), grid behind): a centered Space-Mono status that cycles step labels — "RESOLVING TRACK", "FETCHING LYRICS", "ALIGNING TIMING", "ANALYZING FIDELITY", "GROUNDING DRIFT" — with the active accent. Do not block the UI thread.
+- ON SUCCESS: put the live Song into useResound context (a setSong action), close the menu, land on the Cast view. All four views now render the live Song. Show a small Space-Mono badge: "LIVE" (vs "SHOWCASE" for fixtures), plus quiet notes when timingLevel!=='word' ("LINE-LEVEL SYNC"), translationSource==='generated' ("GENERATED TRANSLATION"), or lyricsRestricted ("PREVIEW LYRICS — LIMITED").
+- ERROR STATES (designed, never a crash or white screen): auth → "API KEY ISSUE"; not_found → "TRACK NOT FOUND — TRY ARTIST + TITLE"; analysis → "ANALYSIS FAILED — RETRY". A retry button. If previewUrl is null the Cast/Rebirth views already fall back to FOLLOW-ALONG MODE.
+- Display the Musixmatch-required copyright/attribution line near the lyrics when present in the API response.
+
+EDGE CASES TO HANDLE EXPLICITLY: Musixmatch envelope status_code checks on every call; tier 402 truncation; richsync→subtitles→none chain; official→generated translation; karaoke/cover filtering and missing previewUrl; strict JSON parse with one repair retry; embeddings batch + cosine + fallback; even time distribution when timingLevel='none'; in-memory cache; no raw-lyrics persistence; long-request safety (keep total pipeline under ~30s). TypeScript must compile; the live Song must satisfy the exact contract so the views need no rendering changes.
+
+Build it, then run a REAL analysis: search "Tití Me Preguntó" / "Bad Bunny", target EN, and show me the Cast view animating on live data with the LIVE badge.
