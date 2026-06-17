@@ -1,0 +1,20 @@
+Rebuild the LandingView hero — it's flat right now (empty grid + static centered text). Make it award-caliber using the dominant 2026 technique: KINETIC TYPOGRAPHY as the main character, driven by an interactive mechanic. Keep the locked design system (void #001209, taupe #D0BEB6, emotion accents, Instrument Serif / Space Grotesk / Space Mono). Edit the landing only. REMOVE "MUSICATHON 2026" from the hero entirely (keep "Built for Musicathon" only in the footer).
+
+THE HERO — "THE BORDER" (a kinetic lyric you translate by dragging):
+- Full viewport. NO bare grid hero. Background: a slow generative flowing COLOR FIELD on the void — a shader or canvas gradient-flow whose hue drifts through the five emotion accents over ~20s, dark and subtle, like ink in water. ALWAYS render, with a CSS animated-gradient fallback if WebGL/canvas fails. The hero must never be empty.
+- CENTER: ONE massive lyric line in Instrument Serif, clamp(2rem,6vw,5rem), as TWO overlaid layers in the same space — the SOURCE-language line and its ENGLISH line. A vertical BORDER divides them: left of it shows the SOURCE layer, right shows the ENGLISH layer, via a clip-mask at the border's X. At the border edge, an ~80px TRANSITION BAND applies a kinetic effect to the letters crossing it: blur + slight channel/RGB split + the emotion accent washing through. Use GSAP for motion.
+- THE MECHANIC (this sells it): the border's X FOLLOWS THE CURSOR (and touch-drag on mobile). Move right → more of the line crosses into English; move left → it reverts to source. The cursor IS the border. When idle ~2s, auto-sweep the border left↔right slowly so it's alive on its own.
+- THE UNTRANSLATABLE WORD: when the border passes a flagged word (e.g. "saudade"), it RESISTS — flickers/glitches, does NOT cleanly resolve, and a small Space-Mono "LOST: no English equivalent" fades in beneath it in the accent.
+- A Space-Mono readout near the border ticks "MEANING <n>%" by border progress; show the pair small, e.g. "PT → EN".
+- Cycle ~4 illustrative lines (~6s each, looping; original lines, NOT real lyrics) spanning languages:
+  1. ES "Bajo el neón te vi bailar" → "Neon on your skin, I watched you dance" — love 93
+  2. PT "Saudade do que nunca foi" → "Longing for what never was" — melancholy 71, lost:"'saudade' has no English equivalent"
+  3. DE "Wir tanzen bis der Himmel brennt" → "We dance till the sky burns" — heat 90
+  4. FR "Je t'aime sous la pluie" → "I love you in the rain" — love 88
+- Small "RESOUND" wordmark top-center; quiet "SIGN IN" top-right (no-op). One Space-Grotesk subline low in the hero: "Watch a song cross a language. Resound measures what survives — and carries it across." Two CTAs (instrument button style): "ANALYZE A SONG" (primary, accent border) → startAnalysis(); "SEE A FEATURED ANALYSIS" → openFeatured(<first id>). A subtle "SCROLL" cue.
+
+SCROLL STORY — kinetic too (Lenis + GSAP ScrollTrigger + SplitText): each section headline splits into characters/words that rise and settle on entry — ONE strong, well-timed reveal per headline, do NOT over-animate everything. Keep the existing sections (THE STAKES; See/Prove/Carry; featured gallery; footer) but give each headline a kinetic reveal and let the background field shift hue as you scroll. Featured cards reveal on scroll; on hover, a tiny border-crossing micro-animation on the card title.
+
+ROBUSTNESS: respect prefers-reduced-motion (disable kinetic motion, show the fully-resolved English state statically). Lazy-load WebGL; cap pixelRatio at 2; dispose on unmount; CTAs pointer/touch/keyboard accessible.
+
+Show me the hero with the kinetic border — drag across it and watch the line translate, the color wash through the letters, and "saudade" resist with the LOST tag.

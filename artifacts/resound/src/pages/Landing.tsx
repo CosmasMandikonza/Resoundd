@@ -3,13 +3,14 @@ import { ChevronDown } from "lucide-react";
 import Lenis from "lenis";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { SplitText } from "gsap/SplitText";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useResound } from "@/context/useResound";
 import { FEATURED } from "@/fixtures/featured";
-import AmbientSphere from "@/components/landing/AmbientSphere";
-import LyricCrossing from "@/components/landing/LyricCrossing";
+import ColorField from "@/components/landing/ColorField";
+import KineticBorder from "@/components/landing/KineticBorder";
 
-gsap.registerPlugin(ScrollTrigger);
+gsap.registerPlugin(ScrollTrigger, SplitText);
 
 const GRID_STYLE = {
   backgroundColor: "var(--void)",
@@ -21,6 +22,18 @@ const GRID_STYLE = {
 const LANDING_CSS = `
 .lenis.lenis-smooth { scroll-behavior: auto !important; }
 .lenis.lenis-stopped { overflow: hidden; }
+@keyframes cf-drift {
+  0% { filter: hue-rotate(0deg); transform: scale(1.04); }
+  100% { filter: hue-rotate(40deg); transform: scale(1.12); }
+}
+.featured-card { position: relative; overflow: hidden; }
+.featured-card .fc-cross {
+  position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--fc-accent) 16%, transparent) 50%, transparent 100%);
+  transform: translateX(-110%);
+  transition: transform 0.7s var(--ease);
+}
+.featured-card:hover .fc-cross { transform: translateX(110%); }
 .cta {
   display: inline-flex; align-items: center; justify-content: center;
   border: 1px solid; border-radius: 2px;
@@ -97,6 +110,14 @@ function HarmonicMotif({ className }: { className?: string }) {
   );
 }
 
+const FEATURED_ACCENTS = [
+  "var(--love)",
+  "var(--melancholy)",
+  "var(--calm)",
+  "var(--joy)",
+  "var(--heat)",
+];
+
 const PILLARS: { key: string; title: string; body: string; accent: string }[] =
   [
     {
@@ -141,6 +162,7 @@ export function Landing() {
     gsap.ticker.add(raf);
     gsap.ticker.lagSmoothing(0);
 
+    const splits: SplitText[] = [];
     const ctx = gsap.context(() => {
       const reveals = gsap.utils.toArray<HTMLElement>("[data-reveal]");
       reveals.forEach((el) => {
@@ -155,11 +177,43 @@ export function Landing() {
           scrollTrigger: { trigger: el, start: "top 85%", once: true },
         });
       });
+
+      // ONE strong kinetic reveal per headline: characters rise and settle.
+      const heads = gsap.utils.toArray<HTMLElement>("[data-split]");
+      heads.forEach((el) => {
+        const split = new SplitText(el, { type: "words,chars" });
+        splits.push(split);
+        gsap.set(el, { opacity: 1 });
+        gsap.from(split.chars, {
+          yPercent: 110,
+          opacity: 0,
+          duration: 0.85,
+          ease: "power4.out",
+          stagger: 0.018,
+          scrollTrigger: { trigger: el, start: "top 82%", once: true },
+        });
+      });
+
+      // Background hue drifts as the story scrolls.
+      const field = rootRef.current?.querySelector<HTMLElement>("[data-field]");
+      if (field) {
+        gsap.to(field, {
+          filter: "hue-rotate(50deg)",
+          ease: "none",
+          scrollTrigger: {
+            trigger: rootRef.current,
+            start: "top top",
+            end: "bottom bottom",
+            scrub: true,
+          },
+        });
+      }
       ScrollTrigger.refresh();
     }, rootRef);
 
     return () => {
       ctx.revert();
+      splits.forEach((s) => s.revert());
       gsap.ticker.remove(raf);
       lenis.destroy();
     };
@@ -169,87 +223,78 @@ export function Landing() {
     <div ref={rootRef} className="relative w-full text-text">
       <style>{LANDING_CSS}</style>
 
-      {/* ============================= HERO ============================= */}
-      <section
-        className="relative flex min-h-screen w-full flex-col items-center justify-center overflow-hidden px-6 py-20"
-        style={GRID_STYLE}
+      {/* Flowing generative color field — always-on hero background. */}
+      <div
+        data-field
+        className="pointer-events-none fixed inset-0 z-0"
+        aria-hidden
       >
-        {/* Minimal HUD */}
-        <header className="pointer-events-none fixed inset-x-0 top-0 z-30 flex items-center justify-between px-6 py-4">
-          <Timecode />
-          <span className="absolute left-1/2 -translate-x-1/2 text-sm uppercase tracking-[0.28em] text-text">
-            RESOUND
-          </span>
-          <div className="pointer-events-auto flex items-center gap-4">
-            <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-faint">
-              MUSICATHON 2026
-            </span>
-            {!auth.isLoading &&
-              (auth.isAuthenticated ? (
-                <div className="flex items-center gap-3">
-                  <span
-                    className="hidden max-w-[10rem] truncate font-mono text-[10px] uppercase tracking-[0.18em] text-text-faint sm:inline"
-                    title={auth.user?.email ?? undefined}
-                  >
-                    {auth.user?.firstName?.trim() ||
-                      auth.user?.email?.split("@")[0] ||
-                      "Account"}
-                  </span>
-                  <button
-                    type="button"
-                    className="link-quiet"
-                    onClick={auth.logout}
-                  >
-                    Sign out
-                  </button>
-                </div>
-              ) : (
+        <ColorField />
+      </div>
+      {/* Scrim — keeps text legible while the field stays visible behind it. */}
+      <div
+        className="pointer-events-none fixed inset-0 z-0 bg-void/70"
+        aria-hidden
+      />
+
+      {/* Minimal HUD — fixed across the whole story. */}
+      <header className="pointer-events-none fixed inset-x-0 top-0 z-30 flex items-center justify-between px-6 py-4">
+        <Timecode />
+        <span className="absolute left-1/2 -translate-x-1/2 text-sm uppercase tracking-[0.28em] text-text">
+          RESOUND
+        </span>
+        <div className="pointer-events-auto flex items-center gap-4">
+          {!auth.isLoading &&
+            (auth.isAuthenticated ? (
+              <div className="flex items-center gap-3">
+                <span
+                  className="hidden max-w-[10rem] truncate font-mono text-[10px] uppercase tracking-[0.18em] text-text-faint sm:inline"
+                  title={auth.user?.email ?? undefined}
+                >
+                  {auth.user?.firstName?.trim() ||
+                    auth.user?.email?.split("@")[0] ||
+                    "Account"}
+                </span>
                 <button
                   type="button"
                   className="link-quiet"
-                  onClick={auth.login}
+                  onClick={auth.logout}
                 >
-                  Sign in
+                  Sign out
                 </button>
-              ))}
-          </div>
-        </header>
+              </div>
+            ) : (
+              <button type="button" className="link-quiet" onClick={auth.login}>
+                Sign in
+              </button>
+            ))}
+        </div>
+      </header>
 
-        {/* Hero stack */}
-        <div className="flex w-full max-w-3xl flex-col items-center gap-7">
-          <h1
-            className="text-center font-serif leading-[1.05] tracking-tight text-text"
-            style={{ fontSize: "clamp(2.5rem, 7vw, 6rem)" }}
+      {/* ============================= HERO ============================= */}
+      <section className="relative z-10 flex min-h-screen w-full flex-col items-center justify-center overflow-hidden px-6 py-24">
+        <KineticBorder />
+
+        <p className="mt-10 max-w-xl text-center font-sans text-base leading-relaxed text-text-dim md:text-lg">
+          Watch a song cross a language. Resound measures what survives — and
+          carries it across.
+        </p>
+
+        <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={startAnalysis}
+            className="cta cta-primary"
           >
-            Every song, alive in every language.
-          </h1>
-          <p className="max-w-xl text-center text-base leading-relaxed text-text-dim md:text-lg">
-            Resound measures whether a song's meaning, emotion, and culture
-            survive translation — and carries them across when they don't.
-          </p>
-
-          <div className="my-2 h-[clamp(220px,38vh,360px)] w-full max-w-[460px]">
-            <AmbientSphere />
-          </div>
-
-          <LyricCrossing />
-
-          <div className="mt-3 flex flex-wrap items-center justify-center gap-3">
-            <button
-              type="button"
-              onClick={startAnalysis}
-              className="cta cta-primary"
-            >
-              Analyze a song
-            </button>
-            <button
-              type="button"
-              onClick={onFeatured}
-              className="cta cta-secondary"
-            >
-              See a featured analysis
-            </button>
-          </div>
+            Analyze a song
+          </button>
+          <button
+            type="button"
+            onClick={onFeatured}
+            className="cta cta-secondary"
+          >
+            See a featured analysis
+          </button>
         </div>
 
         {/* Scroll cue */}
@@ -262,13 +307,14 @@ export function Landing() {
       </section>
 
       {/* ====================== SECTION 1 — STAKES ===================== */}
-      <section className="relative w-full overflow-hidden px-6 py-32">
+      <section className="relative z-10 w-full overflow-hidden px-6 py-32">
         <HarmonicMotif className="pointer-events-none absolute inset-x-0 top-1/2 h-64 w-full -translate-y-1/2 opacity-40" />
         <div className="relative mx-auto flex max-w-3xl flex-col gap-8" data-reveal>
           <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-text-faint">
             The stakes
           </span>
           <h2
+            data-split
             className="font-serif leading-[1.08] tracking-tight text-text"
             style={{ fontSize: "clamp(1.9rem, 4.5vw, 3.4rem)" }}
           >
@@ -283,12 +329,15 @@ export function Landing() {
       </section>
 
       {/* ================== SECTION 2 — SEE/PROVE/CARRY ================ */}
-      <section className="relative w-full px-6 py-32" style={GRID_STYLE}>
+      <section
+        className="relative z-10 w-full px-6 py-32"
+        style={{ ...GRID_STYLE, backgroundColor: "transparent" }}
+      >
         <div className="mx-auto flex max-w-5xl flex-col gap-16">
           <h2
+            data-split
             className="max-w-2xl font-serif leading-[1.08] tracking-tight text-text"
             style={{ fontSize: "clamp(1.9rem, 4.5vw, 3.4rem)" }}
-            data-reveal
           >
             See it. Prove it. Carry it across.
           </h2>
@@ -318,13 +367,60 @@ export function Landing() {
         </div>
       </section>
 
+      {/* ===================== FEATURED GALLERY ====================== */}
+      <section className="relative z-10 w-full px-6 py-32">
+        <div className="mx-auto flex max-w-5xl flex-col gap-12">
+          <h2
+            data-split
+            className="max-w-2xl font-serif leading-[1.08] tracking-tight text-text"
+            style={{ fontSize: "clamp(1.9rem, 4.5vw, 3.4rem)" }}
+          >
+            A song, already carried across.
+          </h2>
+          <div className="grid grid-cols-1 gap-px sm:grid-cols-2 lg:grid-cols-3">
+            {FEATURED.map((f, i) => {
+              const accent = FEATURED_ACCENTS[i % FEATURED_ACCENTS.length];
+              return (
+                <button
+                  key={f.id}
+                  type="button"
+                  data-reveal
+                  onClick={() => openFeatured(f.id)}
+                  className="featured-card group flex flex-col items-start gap-4 border border-line bg-void/80 p-7 text-left transition-colors hover:border-line-bright"
+                  style={{ "--fc-accent": accent } as React.CSSProperties}
+                >
+                  <span className="fc-cross" aria-hidden />
+                  <span
+                    className="font-mono text-[10px] uppercase tracking-[0.24em]"
+                    style={{ color: accent }}
+                  >
+                    {f.song.sourceLang.toUpperCase()} →{" "}
+                    {f.song.targetLang.toUpperCase()}
+                  </span>
+                  <span className="font-serif text-2xl leading-tight text-text">
+                    {f.song.title}
+                  </span>
+                  <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-text-dim">
+                    {f.song.artist}
+                  </span>
+                  <span className="mt-2 font-mono text-[10px] uppercase tracking-[0.22em] text-text-faint transition-colors group-hover:text-text-dim">
+                    View analysis →
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
       {/* ============================ FOOTER =========================== */}
-      <footer className="relative w-full overflow-hidden px-6 py-32">
+      <footer className="relative z-10 w-full overflow-hidden px-6 py-32">
         <div
           className="mx-auto flex max-w-3xl flex-col items-center gap-10 text-center"
           data-reveal
         >
           <h2
+            data-split
             className="font-serif leading-[1.1] tracking-tight text-text"
             style={{ fontSize: "clamp(1.8rem, 4vw, 3rem)" }}
           >
