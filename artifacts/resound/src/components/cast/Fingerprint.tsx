@@ -8,7 +8,7 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import type { Emotion } from "@/types";
 import { useResound } from "@/context/useResound";
@@ -21,6 +21,13 @@ import {
   resolveVoid,
   withAlpha,
 } from "@/lib/colors";
+
+// Vertical FOV of the scene camera (kept in sync with the <Canvas camera>).
+const FOV = 42;
+// Half-extents of the three-sphere group, with a small margin, so framing can
+// guarantee every sphere stays on screen at any container aspect ratio.
+const GROUP_HALF_X = 3.6; // flank center (2.45) + radius (0.82) + margin
+const GROUP_HALF_Y = 1.7; // central radius (1.4) + margin
 
 export interface ClockState {
   tSec: number;
@@ -108,16 +115,20 @@ function makeWashTexture(): THREE.CanvasTexture {
   canvas.height = size;
   const ctx = canvas.getContext("2d");
   if (ctx) {
-    // Luminance ramp built from brand tokens (highlight -> lost-meaning grey ->
-    // void). The emotion accent is applied via per-material tinting on top.
+    // Luminance ramp built from brand tokens. The accent is applied via
+    // per-material tinting (and a matching emissive), so a luminous near-white
+    // top reads as a *hot highlight of the accent hue* that glows, fading
+    // through the full accent down to near-black void at the bottom.
     const text = readCssVar("--text", TEXT_FALLBACK);
-    const drained = resolveDrained();
     const voidColor = resolveVoid();
 
     const grad = ctx.createLinearGradient(0, 0, 0, size);
-    grad.addColorStop(0, text);
-    grad.addColorStop(0.5, drained);
-    grad.addColorStop(1, voidColor);
+    grad.addColorStop(0, "#ffffff"); // hot specular highlight
+    grad.addColorStop(0.16, text); // luminous near-white
+    grad.addColorStop(0.34, lerpColor(text, voidColor, 0.18)); // top third stays bright
+    grad.addColorStop(0.6, lerpColor(text, voidColor, 0.5)); // full accent reads here
+    grad.addColorStop(0.82, lerpColor(text, voidColor, 0.82));
+    grad.addColorStop(1, voidColor); // near-black void
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, size, size);
 
@@ -177,9 +188,14 @@ function Spheres({
     const emo = clockRef.current?.emotion ?? "joy";
     const k = Math.min(1, delta * 2.2);
     if (groupRef.current) groupRef.current.rotation.y += 0.1 * delta;
+    // Albedo and emissive both track the active emotion so the luminous top of
+    // the wash glows in the accent hue rather than reading flat brown.
     centralMat.current?.color.lerp(central[emo], k);
     leftMat.current?.color.lerp(left[emo], k);
     rightMat.current?.color.lerp(right[emo], k);
+    centralMat.current?.emissive.lerp(central[emo], k);
+    leftMat.current?.emissive.lerp(left[emo], k);
+    rightMat.current?.emissive.lerp(right[emo], k);
   });
 
   return (
@@ -189,30 +205,55 @@ function Spheres({
         <meshStandardMaterial
           ref={centralMat}
           map={tex}
+          emissiveMap={tex}
+          emissiveIntensity={0.6}
           roughness={0.85}
           metalness={0.05}
         />
       </mesh>
-      <mesh position={[-2.7, 0, -0.4]}>
+      <mesh position={[-2.45, 0, -0.4]}>
         <sphereGeometry args={[0.82, 48, 48]} />
         <meshStandardMaterial
           ref={leftMat}
           map={tex}
+          emissiveMap={tex}
+          emissiveIntensity={0.5}
           roughness={0.9}
           metalness={0.05}
         />
       </mesh>
-      <mesh position={[2.7, 0, -0.4]}>
+      <mesh position={[2.45, 0, -0.4]}>
         <sphereGeometry args={[0.82, 48, 48]} />
         <meshStandardMaterial
           ref={rightMat}
           map={tex}
+          emissiveMap={tex}
+          emissiveIntensity={0.5}
           roughness={0.9}
           metalness={0.05}
         />
       </mesh>
     </group>
   );
+}
+
+/**
+ * Pulls the camera back so the full sphere group fits — and stays centered —
+ * at any container aspect ratio (the canvas is nearly square in some layouts,
+ * which previously clipped the flanking spheres). Recomputes on resize.
+ */
+function ResponsiveFraming() {
+  const { camera, size } = useThree();
+  useEffect(() => {
+    const aspect = size.width / Math.max(1, size.height);
+    const halfTan = Math.tan((FOV * Math.PI) / 180 / 2);
+    const distForX = GROUP_HALF_X / (halfTan * aspect);
+    const distForY = GROUP_HALF_Y / halfTan;
+    camera.position.set(0, 0, Math.max(distForX, distForY));
+    camera.lookAt(0, 0, 0);
+    camera.updateProjectionMatrix();
+  }, [camera, size.width, size.height]);
+  return null;
 }
 
 export const Fingerprint = memo(function Fingerprint({
@@ -232,10 +273,11 @@ export const Fingerprint = memo(function Fingerprint({
     <WebGLBoundary fallback={<CssFingerprint />}>
       <Canvas
         dpr={[1, 2]}
-        camera={{ position: [0, 0, 7], fov: 42 }}
+        camera={{ position: [0, 0, 7], fov: FOV }}
         gl={{ antialias: true, alpha: true }}
         style={{ width: "100%", height: "100%" }}
       >
+        <ResponsiveFraming />
         <ambientLight intensity={0.5} />
         <directionalLight position={[3, 4, 5]} intensity={1.1} />
         <Spheres

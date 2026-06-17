@@ -7,12 +7,20 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+import { curveCatmullRom, line as d3Line } from "d3-shape";
 import type { ArcPoint, Line } from "@/types";
 import { clamp01, lerpColor } from "@/lib/colors";
 
 const VB_W = 1000;
 const VB_H = 320;
 const PAD_Y = 28;
+
+// Smooth spline through the arc points (Catmull-Rom), replacing straight `L`
+// segments so the valence curves read as continuous lines.
+const splineGen = d3Line<ArcPoint>()
+  .x((p) => pointXY(p)[0])
+  .y((p) => pointXY(p)[1])
+  .curve(curveCatmullRom.alpha(0.5));
 
 interface Props {
   sourceArc: ArcPoint[];
@@ -33,12 +41,7 @@ function pointXY(p: ArcPoint): [number, number] {
 
 function arcPath(arc: ArcPoint[]): string {
   if (!arc.length) return "";
-  return arc
-    .map((p, i) => {
-      const [x, y] = pointXY(p);
-      return `${i === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`;
-    })
-    .join(" ");
+  return splineGen(arc) ?? "";
 }
 
 function divergePath(source: ArcPoint[], translation: ArcPoint[]): string {
