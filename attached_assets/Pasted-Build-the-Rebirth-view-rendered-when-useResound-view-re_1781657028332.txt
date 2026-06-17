@@ -1,0 +1,24 @@
+Build the "Rebirth" view, rendered when useResound view==='rebirth'. Use ONLY fixtures, the Prompt-1 tokens/fonts, the shared runtime color helper, and the synthetic-clock pattern from CastView. Do not touch Cast or Fidelity, and do not wire APIs.
+
+EXTEND THE DATA CONTRACT FIRST:
+- In types.ts, add to Line: `localized: string` (Resound's faithful, singable English rendering) and `rebornFidelity: { meaning:number; emotion:number; culture:number; singability:number }` (the lifted scores).
+- Add to Song: `rebirthAudioUrl: string`, `rebirthOffsetMs: number`, and `singability: { syllableSource:number; syllableLocalized:number; rhyme:boolean; stressMatch:number }`.
+- In showcase.ts, author realistic values: keep the existing `translation` flat/literal (low meaning), make `localized` clearly more faithful and singable (high meaning), pick a clear overall lift. Use a placeholder rebirthAudioUrl for now.
+
+THE REBIRTH VIEW (instrument layout, grid behind, inside HudFrame):
+- HEADER: "REBIRTH" in Instrument Serif + song title, artist, "ES → EN" in Space Grotesk var(--text-dim). 
+- A segmented toggle in Space Mono, uppercase, letter-spacing 0.12em: LITERAL | REBORN. Active segment in the active accent, border 1px var(--line), radius 2px. Default LITERAL.
+- A prominent "HEAR THE REBIRTH" button (HUD button style) and, beside it, a Space-Mono FIDELITY-LIFT readout: "MEANING <literal avg> → <reborn avg>" with the reborn number in the accent.
+- A SINGABILITY PANEL (Space Mono, the originality flex): three readouts from song.singability — "SYLLABLES <source>/<localized>", "RHYME <✓/✗>", "STRESS MATCH <stressMatch>%". This proves the localized version can actually be sung to the melody.
+- THE LYRIC TRANSFORM: a vertical list of fixture.lines. Each row shows the SOURCE line (Instrument Serif, var(--text)) and beneath it the currently-selected rendering:
+  * LITERAL mode: line.translation in Space Grotesk var(--text-dim), with a small drained saturation bar and its meaning score.
+  * REBORN mode: line.localized in Space Grotesk in the line's emotion accent (full saturation), with a fully-saturated bar and its rebornFidelity.meaning score, plus a small "↑" delta vs literal.
+  Toggling LITERAL↔REBORN crossfades the rendering in place (320ms, Prompt-1 easing) and rolls the per-row meaning number — so judges literally watch each line come back to life.
+
+HEAR THE REBIRTH playback:
+- An <audio> element using song.rebirthAudioUrl, offset by rebirthOffsetMs. Play only on user click. As it plays, force REBORN mode and highlight the current line (by tStart/tEnd) in the accent; update context (isPlaying, MM:SS:mmm timecode, activeAccent = current line emotion) so the HUD reacts.
+- EDGE CASE: if rebirthAudioUrl is missing or fails to load (it's a placeholder now), advance the synthetic clock via RAF so the line-by-line highlight still runs, and show a Space-Mono note "NO REBIRTH AUDIO — FOLLOW-ALONG MODE". Never crash.
+
+Other edge cases: guard empty lines and missing localized/rebornFidelity (fall back to translation/fidelity); clean up audio and RAF on unmount.
+
+Build, run, open MENU → REBIRTH, toggle LITERAL→REBORN to show the lines transform and the meaning scores lift, and show me the view.

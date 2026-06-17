@@ -1,1 +1,2 @@
 - [WebGL/R3F sandbox fallback](webgl-sandbox-fallback.md) — screenshot env has no WebGL; gate any react-three-fiber Canvas with detectWebGL + error-boundary CSS fallback, or screenshots crash.
+- [Resound playback views](playback-views.md) — convention for new playback views: audio→synthetic-RAF clock fallback, shared context, derive forced mode from isPlaying, memoize emotion colors.

@@ -6,6 +6,7 @@ import {
 } from "@/context/useResound";
 import FidelityView from "@/components/FidelityView";
 import CastView from "@/components/CastView";
+import RebirthView from "@/components/RebirthView";
 import { clamp01 } from "@/lib/colors";
 
 interface HudFrameProps {
@@ -140,6 +141,8 @@ export function HudFrame({ children, activeMetric }: HudFrameProps) {
         return <CastView />;
       case "fidelity":
         return <FidelityView />;
+      case "rebirth":
+        return <RebirthView />;
       default:
         return children ?? null;
     }
