@@ -1,0 +1,21 @@
+Build the LandingView (rendered when route==='landing'), in the locked design system (void #001209, taupe #D0BEB6, emotion accents, Instrument Serif / Space Grotesk / Space Mono, graph-paper grid, instrument HUD). Aim for award-site quality: one strong idea, exquisite typography, restrained motion. Edit/create the landing only.
+
+LAYOUT — full-viewport HERO first (centered, vertical, instrument-style):
+- The graph-paper grid on var(--void). Minimal HUD: "RESOUND" wordmark top-center, a ticking Space-Mono timecode top-left, "MUSICATHON 2026" tag top-right.
+- A single large RESONANCE SPHERE as the hero, centered, reusing the Fingerprint's CanvasTexture wash + material logic but showing ONE sphere in an AMBIENT mode: slow rotation, the wash hue slowly lerping through all five emotion accents over ~20s, gentle breathing scale. Performance: cap pixelRatio at 2, dispose on unmount, resize-safe. If WebGL is unavailable, use the existing CSS fallback.
+- HEADLINE above the sphere, Instrument Serif, clamp(2.5rem,7vw,6rem): "Every song, alive in every language." Subhead below it, Space Grotesk, var(--text-dim): "Resound measures whether a song's meaning, emotion, and culture survive translation — and carries them across when they don't."
+- THE LIVE LYRIC CROSSING (the centerpiece) below the sphere: cycle through these illustrative lines (~4s each, looping). For each, show the SOURCE line in Instrument Serif in the line's emotion accent, then animate it RESOLVING into the english line (smooth crossfade/wipe, ~900ms) while the accent color shifts, with a Space-Mono "MEANING <n>%" readout. When `lost` is present, show a small Space-Mono "LOST: <note>" in the accent. Lines:
+  1. {source:"Bajo el neón te vi bailar", lang:"ES", english:"Neon on your skin, I watched you dance", emotion:"love", meaning:93}
+  2. {source:"Wir tanzen bis der Himmel brennt", lang:"DE", english:"We dance till the sky burns", emotion:"heat", meaning:90}
+  3. {source:"Saudade do que nunca foi", lang:"PT", english:"Longing for what never was", emotion:"melancholy", meaning:71, lost:"'saudade' has no English equivalent"}
+  4. {source:"Je t'aime sous la pluie", lang:"FR", english:"I love you in the rain", emotion:"love", meaning:88}
+  (These are original illustrative lines, not real song lyrics.)
+- TWO CTAs (instrument HUD button style, Space Mono uppercase): "ANALYZE A SONG" (primary — accent border, fills on hover) calling startAnalysis(); "SEE A FEATURED ANALYSIS" (secondary) calling openFeatured(<first featured id>). Plus a quiet "SIGN IN" link top-right (no-op for now).
+- A subtle scroll cue at the bottom: a thin down chevron + "SCROLL" in Space Mono.
+
+SCROLL STORY (Lenis smooth scroll + GSAP reveal-on-scroll; respect prefers-reduced-motion by disabling motion):
+- SECTION 1 — THE STAKES: Instrument Serif headline "The fastest-growing music on Earth isn't in English." Body (Space Grotesk): Latin America is the fastest-growing region in recorded music; global charts no longer require singing in English. The lyrics are crossing borders — the meaning isn't. Accompany with the harmonic-arc motif (two thin diverging curves) as a faint background.
+- SECTION 2 — "See it. Prove it. Carry it across." Three pillars, each a reveal: SEE (the Meaning-Cast — watch emotion diverge as a song crosses a language), PROVE (the Fidelity map — exactly what's lost, line by line, with grounded evidence), CARRY (Rebirth — a faithful, singable version, reborn). One line each, in the instrument style.
+- FOOTER: the two CTAs again, "Built for Musicathon 2026 · Powered by Musixmatch", and quiet mentions: ElevenLabs · Cyanite · Songstats.
+
+Keep motion slow and intentional (Prompt-1 easing). No generic SaaS gradients/cards. Build it, and show me the hero with the breathing sphere and the lyric crossing animating, plus the scroll story.
