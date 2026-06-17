@@ -2,7 +2,13 @@ import { z } from "zod";
 import { EmotionSchema } from "@workspace/shared-types";
 import { AnalyzeError } from "./errors";
 import { getOpenAI, ANALYSIS_MODEL } from "../openai";
+import { getLlmProvider } from "../provider";
+import { analyzeWithGemini } from "./gemini";
 import type { RawLyricLine } from "./musixmatch";
+
+/** System instruction shared by every provider. */
+export const ANALYSIS_SYSTEM_PROMPT =
+  "You are a precise bilingual lyric analyst. You always return valid JSON matching the requested schema.";
 
 /**
  * The LLM emits scores on a 0-100 scale (easier for the model to reason about);
@@ -56,7 +62,7 @@ export type LlmAnalysis = z.infer<typeof LlmAnalysisSchema>;
 
 const EMOTIONS = "joy | heat | love | calm | melancholy";
 
-function buildPrompt(
+export function buildPrompt(
   lines: RawLyricLine[],
   targetLang: string,
   title: string,
@@ -114,12 +120,44 @@ Rules:
 - Output ONLY the JSON object. No prose, no markdown.`;
 }
 
-export async function analyzeWithLlm(args: {
+export interface AnalyzeArgs {
   lines: RawLyricLine[];
   targetLang: string;
   title: string;
   artist: string;
-}): Promise<LlmAnalysis> {
+}
+
+/** Parse + Zod-validate a raw model JSON string into an LlmAnalysis. */
+export function parseAnalysis(content: string): LlmAnalysis {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    throw new AnalyzeError("analysis", "LLM returned invalid JSON.");
+  }
+
+  const result = LlmAnalysisSchema.safeParse(parsed);
+  if (!result.success) {
+    throw new AnalyzeError(
+      "analysis",
+      `LLM output failed validation: ${result.error.message}`,
+    );
+  }
+  if (result.data.lines.length === 0) {
+    throw new AnalyzeError("analysis", "LLM returned no analyzed lines.");
+  }
+  return result.data;
+}
+
+/** Dispatch to the active provider (LLM_PROVIDER). Both share the same schema. */
+export async function analyzeWithLlm(args: AnalyzeArgs): Promise<LlmAnalysis> {
+  if (getLlmProvider() === "gemini") {
+    return analyzeWithGemini(args);
+  }
+  return analyzeWithOpenAI(args);
+}
+
+async function analyzeWithOpenAI(args: AnalyzeArgs): Promise<LlmAnalysis> {
   const openai = getOpenAI();
   let content: string;
   try {
@@ -131,8 +169,7 @@ export async function analyzeWithLlm(args: {
         messages: [
           {
             role: "system",
-            content:
-              "You are a precise bilingual lyric analyst. You always return valid JSON matching the requested schema.",
+            content: ANALYSIS_SYSTEM_PROMPT,
           },
           {
             role: "user",
@@ -169,22 +206,5 @@ export async function analyzeWithLlm(args: {
     throw new AnalyzeError("analysis", "The analysis model request failed.");
   }
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(content);
-  } catch {
-    throw new AnalyzeError("analysis", "LLM returned invalid JSON.");
-  }
-
-  const result = LlmAnalysisSchema.safeParse(parsed);
-  if (!result.success) {
-    throw new AnalyzeError(
-      "analysis",
-      `LLM output failed validation: ${result.error.message}`,
-    );
-  }
-  if (result.data.lines.length === 0) {
-    throw new AnalyzeError("analysis", "LLM returned no analyzed lines.");
-  }
-  return result.data;
+  return parseAnalysis(content);
 }

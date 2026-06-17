@@ -1,0 +1,16 @@
+Add "gemini" as a third LLM_PROVIDER option (alongside openai/anthropic) for BOTH the analysis call and the embeddings call, and make it the active provider. This is a self-contained change to the provider/client layer only — do NOT touch the views, the pipeline shape, the Zod contract, the timeout/error handling, or the secret-sanitization.
+
+ANALYSIS (Gemini):
+- Read GEMINI_API_KEY from process.env (server-side only).
+- Call https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent with header "x-goog-api-key: <key>".
+- Body: { systemInstruction:{parts:[{text:<the existing system prompt>}]}, contents:[{role:"user",parts:[{text:<the existing user input>}]}], generationConfig:{ responseMimeType:"application/json", responseSchema:<the analysis JSON schema, converted from the existing Zod schema via zod-to-json-schema>, temperature:0, maxOutputTokens: enough for ~30 lines } }.
+- Parse candidates[0].content.parts[0].text as JSON, then validate against the SAME Zod schema already used for OpenAI. Keep the existing one-retry parse-repair on failure.
+- Apply the SAME request timeout already added for OpenAI (hold the ~30s budget). On a 429, surface the real cause exactly like the OpenAI path (distinguish rate-limit vs quota from the structured Gemini error).
+
+EMBEDDINGS (Gemini) for the drift step:
+- Use Gemini's embedding model (gemini-embedding-001, or text-embedding-004 if that's unavailable) via https://generativelanguage.googleapis.com/v1beta/models/<model>:batchEmbedContents with the x-goog-api-key header, batching all line pairs in one request. Compute cosine distance locally exactly as before.
+- FALLBACK unchanged: if GEMINI_API_KEY is missing or the embeddings call fails, set line.drift = 1 - meaning/100. Never crash the pipeline on an embeddings failure.
+
+Keep openai and anthropic providers intact and switchable via LLM_PROVIDER. TypeScript must compile.
+
+Then run a real live analysis: "Tití Me Preguntó" / "Bad Bunny" → EN, and show me the Cast view animating on LIVE data with the LIVE badge, plus tell me whether richsync returned word timing, whether the translation was official or generated, and whether the lyrics were full or restricted.

@@ -1,4 +1,6 @@
 import { getOpenAI, EMBEDDING_MODEL } from "../openai";
+import { getLlmProvider } from "../provider";
+import { embedWithGemini } from "./gemini";
 
 function cosine(a: number[], b: number[]): number {
   let dot = 0;
@@ -11,6 +13,23 @@ function cosine(a: number[], b: number[]): number {
   }
   if (na === 0 || nb === 0) return 0;
   return dot / (Math.sqrt(na) * Math.sqrt(nb));
+}
+
+/** Embed all inputs with the active provider, or null on any failure. */
+async function embed(inputs: string[]): Promise<number[][] | null> {
+  if (getLlmProvider() === "gemini") {
+    return embedWithGemini(inputs);
+  }
+  try {
+    const openai = getOpenAI();
+    const res = await openai.embeddings.create(
+      { model: EMBEDDING_MODEL, input: inputs },
+      { timeout: 15000, maxRetries: 1 },
+    );
+    return res.data.map((d) => d.embedding);
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -29,29 +48,19 @@ export async function computeDrift(
     inputs.push(p.source, p.backTranslation);
   }
 
-  try {
-    const openai = getOpenAI();
-    const res = await openai.embeddings.create(
-      {
-        model: EMBEDDING_MODEL,
-        input: inputs,
-      },
-      { timeout: 15000, maxRetries: 1 },
-    );
-    const vectors = res.data.map((d) => d.embedding);
-    const drift: number[] = [];
-    for (let i = 0; i < pairs.length; i++) {
-      const src = vectors[i * 2];
-      const back = vectors[i * 2 + 1];
-      if (!src || !back) {
-        drift.push(0.5);
-        continue;
-      }
-      const sim = cosine(src, back);
-      drift.push(Math.max(0, Math.min(1, 1 - sim)));
+  const vectors = await embed(inputs);
+  if (!vectors || vectors.length !== inputs.length) return null;
+
+  const drift: number[] = [];
+  for (let i = 0; i < pairs.length; i++) {
+    const src = vectors[i * 2];
+    const back = vectors[i * 2 + 1];
+    if (!src || !back) {
+      drift.push(0.5);
+      continue;
     }
-    return drift;
-  } catch {
-    return null;
+    const sim = cosine(src, back);
+    drift.push(Math.max(0, Math.min(1, 1 - sim)));
   }
+  return drift;
 }
