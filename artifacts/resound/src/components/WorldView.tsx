@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { useResound } from "@/context/useResound";
-import showcaseSong from "@/fixtures/showcase";
 import type { Fidelity, Market } from "@/types";
 import {
   clamp01,
@@ -43,8 +42,8 @@ function arcPath(o: Market, m: Market): string {
 }
 
 export function WorldView() {
-  const { setView } = useResound();
-  const { title, markets } = showcaseSong;
+  const { setView, song } = useResound();
+  const { title, markets } = song;
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [shown, setShown] = useState<Market | null>(null);

@@ -6,7 +6,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { Emotion } from "@/types";
+import type { Emotion, Song } from "@/types";
+import showcaseSong from "@/fixtures/showcase";
 
 export type Metric = "meaning" | "emotion" | "culture" | "singability";
 
@@ -42,6 +43,14 @@ interface ResoundContextValue {
   /** Resonance readout, 0..1 (defaults to 0). Shown bottom-left in the HUD. */
   resonance: number;
   setResonance: (value: number) => void;
+  /** The song currently rendered by every view (defaults to the showcase). */
+  song: Song;
+  /** True once a live analysis result has been loaded (vs. the showcase fixture). */
+  isLive: boolean;
+  /** Load a freshly-analyzed song; marks the session LIVE and resets playback. */
+  loadSong: (song: Song) => void;
+  /** Return to the built-in showcase song. */
+  resetToShowcase: () => void;
 }
 
 const ResoundContext = createContext<ResoundContextValue | null>(null);
@@ -53,8 +62,22 @@ export function ResoundProvider({ children }: { children: ReactNode }) {
   const [activeMetric, setActiveMetric] = useState<Metric>("meaning");
   const [view, setView] = useState<View>("cast");
   const [resonance, setResonance] = useState(0);
+  const [song, setSong] = useState<Song>(showcaseSong);
+  const [isLive, setIsLive] = useState(false);
 
   const togglePlaying = useCallback(() => setIsPlaying((p) => !p), []);
+
+  const loadSong = useCallback((next: Song) => {
+    setIsPlaying(false);
+    setSong(next);
+    setIsLive(true);
+  }, []);
+
+  const resetToShowcase = useCallback(() => {
+    setIsPlaying(false);
+    setSong(showcaseSong);
+    setIsLive(false);
+  }, []);
 
   const value = useMemo<ResoundContextValue>(
     () => ({
@@ -72,6 +95,10 @@ export function ResoundProvider({ children }: { children: ReactNode }) {
       setView,
       resonance,
       setResonance,
+      song,
+      isLive,
+      loadSong,
+      resetToShowcase,
     }),
     [
       activeEmotion,
@@ -81,6 +108,10 @@ export function ResoundProvider({ children }: { children: ReactNode }) {
       activeMetric,
       view,
       resonance,
+      song,
+      isLive,
+      loadSong,
+      resetToShowcase,
     ],
   );
 

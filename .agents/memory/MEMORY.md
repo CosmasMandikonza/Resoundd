@@ -1,2 +1,2 @@
-- [WebGL/R3F sandbox fallback](webgl-sandbox-fallback.md) — screenshot env has no WebGL; gate any react-three-fiber Canvas with detectWebGL + error-boundary CSS fallback, or screenshots crash.
-- [Resound playback views](playback-views.md) — convention for new playback views: audio→synthetic-RAF clock fallback, shared context, derive forced mode from isPlaying, memoize emotion colors.
+- [Resound fidelity scale boundary](resound-fidelity-scale.md) — Song contract fidelity/drift are 0..1 (views consume directly); the analysis LLM emits 0-100, so the pipeline must /100 on assembly.
+- [Analyze error sanitization](analyze-error-sanitization.md) — never put credentialed upstream URLs in errors returned to the client; Musixmatch API key rides in the query string.

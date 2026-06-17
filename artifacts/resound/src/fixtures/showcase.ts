@@ -408,6 +408,8 @@ export const showcaseSong: Song = {
     stressMatch: 88,
   },
   markets,
+  timingLevel: "line",
+  translationSource: "official",
 };
 
 export default showcaseSong;

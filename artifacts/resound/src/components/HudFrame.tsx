@@ -8,6 +8,7 @@ import FidelityView from "@/components/FidelityView";
 import CastView from "@/components/CastView";
 import RebirthView from "@/components/RebirthView";
 import WorldView from "@/components/WorldView";
+import AnalyzePanel from "@/components/AnalyzePanel";
 import { clamp01 } from "@/lib/colors";
 
 interface HudFrameProps {
@@ -62,6 +63,7 @@ function MenuOverlay({
   onSelect: (view: View) => void;
   onClose: () => void;
 }) {
+  const { resetToShowcase, isLive } = useResound();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -88,31 +90,48 @@ function MenuOverlay({
         Close
       </button>
 
-      <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-4 px-6 font-mono text-xl uppercase tracking-[0.2em]">
-        {MENU_ITEMS.map((item, i) => {
-          const isActive = item.view === current;
-          return (
-            <span key={item.view} className="flex items-center gap-5">
-              <button
-                type="button"
-                onClick={() => onSelect(item.view)}
-                className="bg-transparent uppercase tracking-[0.2em] transition-colors duration-[280ms] hover:text-text"
-                style={{
-                  color: isActive ? accent : "var(--text-faint)",
-                  transitionTimingFunction: "var(--ease)",
-                }}
-              >
-                {item.label}
-              </button>
-              {i < MENU_ITEMS.length - 1 && (
-                <span className="text-text-faint" aria-hidden>
-                  ·
-                </span>
-              )}
-            </span>
-          );
-        })}
-      </nav>
+      <div className="flex max-h-full w-full flex-col items-center gap-10 overflow-y-auto px-6 py-20">
+        <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-4 font-mono text-xl uppercase tracking-[0.2em]">
+          {MENU_ITEMS.map((item, i) => {
+            const isActive = item.view === current;
+            return (
+              <span key={item.view} className="flex items-center gap-5">
+                <button
+                  type="button"
+                  onClick={() => onSelect(item.view)}
+                  className="bg-transparent uppercase tracking-[0.2em] transition-colors duration-[280ms] hover:text-text"
+                  style={{
+                    color: isActive ? accent : "var(--text-faint)",
+                    transitionTimingFunction: "var(--ease)",
+                  }}
+                >
+                  {item.label}
+                </button>
+                {i < MENU_ITEMS.length - 1 && (
+                  <span className="text-text-faint" aria-hidden>
+                    ·
+                  </span>
+                )}
+              </span>
+            );
+          })}
+        </nav>
+
+        <AnalyzePanel onAnalyzed={() => onSelect("cast")} />
+
+        {isLive && (
+          <button
+            type="button"
+            onClick={() => {
+              resetToShowcase();
+              onClose();
+            }}
+            className="bg-transparent font-mono text-[10px] uppercase tracking-[0.18em] text-text-faint underline-offset-4 hover:text-text-dim hover:underline"
+          >
+            Return to showcase
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -128,10 +147,22 @@ export function HudFrame({ children, activeMetric }: HudFrameProps) {
     view,
     setView,
     resonance,
+    song,
+    isLive,
   } = useResound();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const currentMetric = activeMetric ?? ctxMetric;
+
+  // Quiet provenance qualifiers shown bottom-right (live data only).
+  const notes: string[] = [];
+  if (isLive) {
+    notes.push(
+      song.timingLevel === "line" ? "LINE-LEVEL SYNC" : "ESTIMATED TIMING",
+    );
+    if (song.translationSource === "generated") notes.push("GENERATED TRANSLATION");
+    if (song.lyricsRestricted) notes.push("PREVIEW LYRICS — LIMITED");
+  }
   const resonanceLabel = `RESONANCE ${(clamp01(resonance) * 100)
     .toFixed(1)
     .padStart(4, "0")}%`;
@@ -139,13 +170,13 @@ export function HudFrame({ children, activeMetric }: HudFrameProps) {
   const renderView = () => {
     switch (view) {
       case "cast":
-        return <CastView />;
+        return <CastView key={song.id} />;
       case "fidelity":
-        return <FidelityView />;
+        return <FidelityView key={song.id} />;
       case "rebirth":
-        return <RebirthView />;
+        return <RebirthView key={song.id} />;
       case "world":
-        return <WorldView />;
+        return <WorldView key={song.id} />;
       default:
         return children ?? null;
     }
@@ -180,10 +211,20 @@ export function HudFrame({ children, activeMetric }: HudFrameProps) {
           </span>
         </div>
 
-        {/* Top-center: wordmark */}
-        <div className="absolute left-1/2 -translate-x-1/2">
+        {/* Top-center: wordmark + LIVE/SHOWCASE badge */}
+        <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-3">
           <span className="text-sm uppercase tracking-[0.2em] text-text">
             RESOUND
+          </span>
+          <span
+            className="border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.18em]"
+            style={{
+              borderRadius: 2,
+              borderColor: isLive ? activeAccent : "var(--line)",
+              color: isLive ? activeAccent : "var(--text-faint)",
+            }}
+          >
+            {isLive ? "LIVE" : "SHOWCASE"}
           </span>
         </div>
 
@@ -234,13 +275,26 @@ export function HudFrame({ children, activeMetric }: HudFrameProps) {
           })}
         </div>
 
-        {/* Bottom-right spacer to balance the readout. */}
-        <span
-          aria-hidden
-          className="font-mono text-xs uppercase tracking-[0.12em] text-text-faint opacity-0"
-        >
-          {resonanceLabel}
-        </span>
+        {/* Bottom-right: provenance qualifiers (live data only). */}
+        {notes.length > 0 ? (
+          <div className="flex flex-col items-end gap-0.5 text-right font-mono text-[10px] uppercase tracking-[0.12em] text-text-faint">
+            {notes.map((note) => (
+              <span key={note}>{note}</span>
+            ))}
+            {song.copyright && (
+              <span className="max-w-[16rem] truncate normal-case tracking-normal text-text-faint/70">
+                {song.copyright}
+              </span>
+            )}
+          </div>
+        ) : (
+          <span
+            aria-hidden
+            className="font-mono text-xs uppercase tracking-[0.12em] text-text-faint opacity-0"
+          >
+            {resonanceLabel}
+          </span>
+        )}
       </footer>
 
       {menuOpen && (

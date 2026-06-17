@@ -6,7 +6,6 @@ import {
   type CSSProperties,
 } from "react";
 import { useResound } from "@/context/useResound";
-import showcaseSong from "@/fixtures/showcase";
 import type { Emotion, Line } from "@/types";
 import { resolveDrained, resolveEmotionColor } from "@/lib/colors";
 
@@ -161,10 +160,15 @@ function LyricRow({
 }
 
 export function RebirthView() {
-  const { isPlaying, setIsPlaying, setActiveEmotion, setTimecode, setResonance } =
-    useResound();
+  const {
+    isPlaying,
+    setIsPlaying,
+    setActiveEmotion,
+    setTimecode,
+    setResonance,
+    song,
+  } = useResound();
 
-  const song = showcaseSong;
   const { lines, rebirthAudioUrl, rebirthOffsetMs, durationMs, singability } =
     song;
   const durationSec = durationMs / 1000;

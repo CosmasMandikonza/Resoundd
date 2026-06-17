@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { useResound, type Metric } from "@/context/useResound";
-import showcaseSong from "@/fixtures/showcase";
 import type { Emotion, Line } from "@/types";
 import {
   clamp01,
@@ -87,7 +86,7 @@ function LossMapRow({
     1 - score,
   );
 
-  const drift = (1 - fidelityScore(line, "meaning")).toFixed(2);
+  const drift = (line.drift ?? 1 - fidelityScore(line, "meaning")).toFixed(2);
   const arcDeviation = (1 - fidelityScore(line, "emotion")).toFixed(2);
 
   return (
@@ -213,8 +212,7 @@ function LossMapRow({
 }
 
 export function FidelityView() {
-  const { activeMetric } = useResound();
-  const song = showcaseSong;
+  const { activeMetric, song } = useResound();
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   // Resolve accent/drained colors from the CSS tokens (tokens.css is authoritative).
@@ -251,7 +249,7 @@ export function FidelityView() {
           <p className="mt-2 text-sm text-text-dim">
             {song.artist}
             <span className="mx-2 text-text-faint">·</span>
-            ES → EN
+            {`${song.sourceLang.toUpperCase()} → ${song.targetLang.toUpperCase()}`}
           </p>
         </div>
 

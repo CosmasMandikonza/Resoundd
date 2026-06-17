@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useResound } from "@/context/useResound";
-import showcaseSong from "@/fixtures/showcase";
 import { resolveDrained, resolveEmotionColor } from "@/lib/colors";
 import Fingerprint, { type ClockState } from "@/components/cast/Fingerprint";
 import HarmonicArcs from "@/components/cast/HarmonicArcs";
@@ -24,9 +23,9 @@ export function CastView() {
     setActiveEmotion,
     setTimecode,
     setResonance,
+    song,
   } = useResound();
 
-  const song = showcaseSong;
   const { lines, fingerprint, durationMs, previewUrl, overallFidelity } = song;
   const durationSec = durationMs / 1000;
 
