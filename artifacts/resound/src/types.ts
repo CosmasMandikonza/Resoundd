@@ -35,6 +35,23 @@ export interface Fingerprint {
   translationArc: ArcPoint[];
 }
 
+export interface Market {
+  id: string;
+  name: string;
+  lang: string;
+  /** Pixel coords for an equirectangular map, viewBox "0 0 1000 500". */
+  x: number;
+  y: number;
+  origin?: boolean;
+  /** 0..100 — how ready the localized release is for this market. */
+  readiness: number;
+  fidelity: Fidelity;
+  /** Streams change over the trailing 30 days, as a percentage. */
+  streamsDelta: number;
+  momentum: "high" | "rising" | "flat";
+  risk?: string;
+}
+
 export interface Song {
   id: string;
   title: string;
@@ -58,4 +75,6 @@ export interface Song {
     rhyme: boolean;
     stressMatch: number;
   };
+  /** Per-market global release readiness for the cockpit view. */
+  markets: Market[];
 }

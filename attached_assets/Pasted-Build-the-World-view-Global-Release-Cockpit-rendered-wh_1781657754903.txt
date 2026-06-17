@@ -1,0 +1,27 @@
+Build the "World" view (Global Release Cockpit), rendered when useResound view==='world'. Use ONLY fixtures, Prompt-1 tokens/fonts, the shared runtime color helper, and the Prompt-1 easing. Do not touch other views or wire APIs.
+
+EXTEND THE DATA CONTRACT FIRST:
+- types.ts: add interface Market { id:string; name:string; lang:string; x:number; y:number; origin?:boolean; readiness:number; fidelity:{meaning:number;emotion:number;culture:number;singability:number}; streamsDelta:number; momentum:'high'|'rising'|'flat'; risk?:string }. Add `markets: Market[]` to Song.
+- showcase.ts: author SIX markets. x/y are pixel coords for an equirectangular map with viewBox "0 0 1000 500" (adjust visually if your map differs):
+  * Spain   (origin:true) x490 y138, readiness 100, momentum 'flat',   streamsDelta 3
+  * Brazil  x371 y315, readiness 54,  momentum 'high',   streamsDelta 34, risk: a short cross-cultural note
+  * Mexico  x225 y196, readiness 82,  momentum 'rising', streamsDelta 18
+  * United States x294 y137, readiness 88, momentum 'rising', streamsDelta 12
+  * Germany x537 y104, readiness 76,  momentum 'flat',   streamsDelta 4
+  * Japan   x888 y151, readiness 61,  momentum 'rising', streamsDelta 9
+  Give each plausible fidelity sub-scores consistent with its readiness.
+
+THE WORLD VIEW (instrument layout, grid behind, inside HudFrame):
+- HEADER: "GLOBAL RELEASE" in Instrument Serif + song title; "READINESS BY MARKET" in Space Mono var(--text-dim).
+- THE MAP: render a faint equirectangular world map as a backdrop (use a simple inline world-map SVG path or a dotted world grid, stroked in var(--line) — keep it decorative and faint, NOT a bright filled map). Over it, plot each market as a node at (x,y):
+  * Node color = readiness ≥75 → full var(--joy); below that, lerp toward var(--drained) as readiness drops (the draining mechanic again).
+  * Node size scales with momentum (high > rising > flat).
+  * Space-Mono label beside each node: NAME · readiness% · a ▲ glyph in the accent if momentum is 'rising' or 'high'.
+  * Thin arcs (reuse the HarmonicArcs curve style) from the origin market (Spain) to each target, drawn on with stroke-dashoffset (~900ms).
+  * The market with the highest momentum AND readiness<70 gets a slow pulsing ring — this is the opportunity.
+- THE OPPORTUNITY CALLOUT (the money insight, prominent, Space Mono): compute the highest-momentum market with readiness<70 and show "OPPORTUNITY · {NAME} · MOMENTUM ▲ HIGH · READINESS {n} · LOCALIZE FIRST" with the readiness number in var(--risk)-adjacent emphasis (use the accent, not risk-coral). This makes the dormant-revenue point land.
+- CLICK A MARKET → a detail panel slides in (var(--surface), 1px var(--line), radius 2px): market name + lang, big readiness number, the four fidelity sub-scores as mini Space-Mono bars, a momentum line "STREAMS ▲ {streamsDelta}% / 30D" (Songstats-style, ▲ in accent), a "CROSS-CULTURAL RISK" section in var(--risk) if market.risk exists, and a "REBIRTH FOR {NAME}" button (HUD button style) that calls setView('rebirth'). Only one panel open at a time.
+
+EDGE CASES: guard empty markets and missing fidelity fields; nodes are keyboard-focusable and open the panel on Enter/Space; Escape closes the panel; clean up any animations on unmount.
+
+Build, run, open MENU → WORLD, click Brazil to open its panel, and show me the cockpit with the opportunity callout and the origin→market arcs.

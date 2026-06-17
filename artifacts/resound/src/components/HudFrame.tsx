@@ -7,6 +7,7 @@ import {
 import FidelityView from "@/components/FidelityView";
 import CastView from "@/components/CastView";
 import RebirthView from "@/components/RebirthView";
+import WorldView from "@/components/WorldView";
 import { clamp01 } from "@/lib/colors";
 
 interface HudFrameProps {
@@ -143,6 +144,8 @@ export function HudFrame({ children, activeMetric }: HudFrameProps) {
         return <FidelityView />;
       case "rebirth":
         return <RebirthView />;
+      case "world":
+        return <WorldView />;
       default:
         return children ?? null;
     }

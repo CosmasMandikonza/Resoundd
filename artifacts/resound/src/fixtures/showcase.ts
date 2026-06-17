@@ -1,4 +1,4 @@
-import type { ArcPoint, Emotion, Line, Song } from "@/types";
+import type { ArcPoint, Emotion, Line, Market, Song } from "@/types";
 
 /**
  * One realistic Spanish -> English crossover track (Bad Bunny-style).
@@ -279,6 +279,108 @@ const avg = (key: keyof Line["fidelity"]): number =>
     (lines.reduce((sum, l) => sum + l.fidelity[key], 0) / lines.length) * 100,
   ) / 100;
 
+/**
+ * Six release markets plotted on an equirectangular world map
+ * (viewBox "0 0 1000 500"). Spain is the origin (source language, fully
+ * native); fidelity sub-scores track each market's readiness — the further
+ * the culture/language is from the source, the more meaning has drained.
+ */
+const markets: Market[] = [
+  {
+    id: "es",
+    name: "Spain",
+    lang: "es",
+    x: 490,
+    y: 138,
+    origin: true,
+    readiness: 100,
+    fidelity: { meaning: 1, emotion: 1, culture: 1, singability: 1 },
+    streamsDelta: 3,
+    momentum: "flat",
+  },
+  {
+    id: "br",
+    name: "Brazil",
+    lang: "pt",
+    x: 371,
+    y: 315,
+    readiness: 54,
+    fidelity: {
+      meaning: 0.61,
+      emotion: 0.58,
+      culture: 0.42,
+      singability: 0.5,
+    },
+    streamsDelta: 34,
+    momentum: "high",
+    risk: "Reggaetón slang lands differently against Brazilian funk culture — \"perreo\" has no clean Portuguese equivalent and can read as crude.",
+  },
+  {
+    id: "mx",
+    name: "Mexico",
+    lang: "es",
+    x: 225,
+    y: 196,
+    readiness: 82,
+    fidelity: {
+      meaning: 0.87,
+      emotion: 0.85,
+      culture: 0.8,
+      singability: 0.82,
+    },
+    streamsDelta: 18,
+    momentum: "rising",
+  },
+  {
+    id: "us",
+    name: "United States",
+    lang: "en",
+    x: 294,
+    y: 137,
+    readiness: 88,
+    fidelity: {
+      meaning: 0.9,
+      emotion: 0.88,
+      culture: 0.82,
+      singability: 0.86,
+    },
+    streamsDelta: 12,
+    momentum: "rising",
+  },
+  {
+    id: "de",
+    name: "Germany",
+    lang: "de",
+    x: 537,
+    y: 104,
+    readiness: 76,
+    fidelity: {
+      meaning: 0.8,
+      emotion: 0.76,
+      culture: 0.7,
+      singability: 0.72,
+    },
+    streamsDelta: 4,
+    momentum: "flat",
+  },
+  {
+    id: "jp",
+    name: "Japan",
+    lang: "ja",
+    x: 888,
+    y: 151,
+    readiness: 61,
+    fidelity: {
+      meaning: 0.66,
+      emotion: 0.62,
+      culture: 0.5,
+      singability: 0.55,
+    },
+    streamsDelta: 9,
+    momentum: "rising",
+  },
+];
+
 export const showcaseSong: Song = {
   id: "song-neon-tide",
   title: "Neón y Marea",
@@ -305,6 +407,7 @@ export const showcaseSong: Song = {
     rhyme: true,
     stressMatch: 88,
   },
+  markets,
 };
 
 export default showcaseSong;
