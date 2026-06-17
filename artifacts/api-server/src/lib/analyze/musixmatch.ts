@@ -148,6 +148,29 @@ export async function resolveTrack(input: {
   };
 }
 
+/**
+ * Resolve a track deterministically by its Musixmatch `track_id`. Used when
+ * reopening a saved analysis so the re-fetched lyrics always belong to the
+ * exact track that was originally analyzed (no title/artist re-matching).
+ */
+export async function fetchTrackById(trackId: number): Promise<ResolvedTrack> {
+  const body = await mxm<{ track?: MxmTrack }>("track.get", {
+    track_id: trackId,
+  });
+  const track = body.track;
+  if (!track) {
+    throw new AnalyzeError("not_found", "Track not found on Musixmatch.");
+  }
+  return {
+    trackId: track.track_id,
+    commontrackId: track.commontrack_id,
+    trackName: track.track_name,
+    artistName: track.artist_name,
+    durationMs: track.track_length ? track.track_length * 1000 : undefined,
+    hasSubtitles: track.has_subtitles === 1,
+  };
+}
+
 const DISCLAIMER_PATTERNS = [
   /not for commercial use/i,
   /^\*+$/,

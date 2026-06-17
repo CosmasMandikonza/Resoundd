@@ -152,6 +152,22 @@ export const AnalyzeInputSchema = z
   });
 export type AnalyzeInput = z.infer<typeof AnalyzeInputSchema>;
 
+/**
+ * A compact summary of a user's saved analysis, used to render the SAVED list.
+ * The full `Song` is fetched separately when an entry is reopened.
+ */
+export const SavedAnalysisSummarySchema = z.object({
+  id: z.string(),
+  trackId: z.string(),
+  title: z.string(),
+  artist: z.string(),
+  sourceLang: z.string(),
+  targetLang: z.string(),
+  /** ISO-8601 timestamp of when the analysis was saved. */
+  savedAt: z.string(),
+});
+export type SavedAnalysisSummary = z.infer<typeof SavedAnalysisSummarySchema>;
+
 /** Machine-readable failure kinds surfaced by the analyze pipeline. */
 export const ANALYZE_ERROR_KINDS = [
   "validation",

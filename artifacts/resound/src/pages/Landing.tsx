@@ -3,6 +3,7 @@ import { ChevronDown } from "lucide-react";
 import Lenis from "lenis";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { useAuth } from "@workspace/replit-auth-web";
 import { useResound } from "@/context/useResound";
 import { FEATURED } from "@/fixtures/featured";
 import AmbientSphere from "@/components/landing/AmbientSphere";
@@ -120,6 +121,7 @@ const PILLARS: { key: string; title: string; body: string; accent: string }[] =
 
 export function Landing() {
   const { startAnalysis, openFeatured } = useResound();
+  const auth = useAuth();
   const firstFeaturedId = FEATURED[0]?.id;
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -182,9 +184,34 @@ export function Landing() {
             <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-faint">
               MUSICATHON 2026
             </span>
-            <button type="button" className="link-quiet">
-              Sign in
-            </button>
+            {!auth.isLoading &&
+              (auth.isAuthenticated ? (
+                <div className="flex items-center gap-3">
+                  <span
+                    className="hidden max-w-[10rem] truncate font-mono text-[10px] uppercase tracking-[0.18em] text-text-faint sm:inline"
+                    title={auth.user?.email ?? undefined}
+                  >
+                    {auth.user?.firstName?.trim() ||
+                      auth.user?.email?.split("@")[0] ||
+                      "Account"}
+                  </span>
+                  <button
+                    type="button"
+                    className="link-quiet"
+                    onClick={auth.logout}
+                  >
+                    Sign out
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="link-quiet"
+                  onClick={auth.login}
+                >
+                  Sign in
+                </button>
+              ))}
           </div>
         </header>
 

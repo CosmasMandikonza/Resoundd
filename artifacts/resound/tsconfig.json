@@ -22,6 +22,9 @@
     },
     {
       "path": "../../lib/shared-types"
+    },
+    {
+      "path": "../../lib/replit-auth-web"
     }
   ]
 }

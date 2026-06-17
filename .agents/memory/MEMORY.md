@@ -2,3 +2,4 @@
 - [Analyze error sanitization](analyze-error-sanitization.md) — never put credentialed upstream URLs in errors returned to the client; Musixmatch API key rides in the query string.
 - [Resound Gemini provider](resound-gemini-provider.md) — Gemini schema 400 trap, ~30-42s latency / 60s timeout, retry-only-transient policy, per-process cache caveat.
 - [Resound landing isolation](resound-landing.md) — edit-landing-only: sphere replicates Fingerprint wash; gsap/lenis are devDeps (not in catalog); scroll motion gated on prefers-reduced-motion.
+- [Resound saved analyses + optional auth](resound-saved-analyses.md) — derived-only persistence (strip raw line.source), reopen re-fetches by Musixmatch track_id not title/artist, optional-auth wiring + composite-lib gotcha.

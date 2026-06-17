@@ -9,6 +9,13 @@ import CastView from "@/components/CastView";
 import RebirthView from "@/components/RebirthView";
 import WorldView from "@/components/WorldView";
 import AnalyzePanel from "@/components/AnalyzePanel";
+import {
+  SaveButton,
+  SavedButton,
+  AuthControl,
+  SavedOverlay,
+} from "@/components/SavedControls";
+import { useAuth } from "@workspace/replit-auth-web";
 import { clamp01 } from "@/lib/colors";
 import type { Song } from "@/types";
 
@@ -198,6 +205,8 @@ export function HudFrame({ children, activeMetric }: HudFrameProps) {
   } = useResound();
 
   const [menuOpen, setMenuOpen] = useState(false);
+  const [savedOpen, setSavedOpen] = useState(false);
+  const auth = useAuth();
   const currentMetric = activeMetric ?? ctxMetric;
 
   // Quiet provenance qualifiers shown bottom-right (live data only).
@@ -270,15 +279,18 @@ export function HudFrame({ children, activeMetric }: HudFrameProps) {
           </span>
         </div>
 
-        {/* Top-right: persistent nav + PLAY/PAUSE + MENU */}
+        {/* Top-right: persistent nav + SAVE/SAVED + auth + PLAY/PAUSE + MENU */}
         <div className="flex items-center gap-2">
           <HudButton label="New Analysis" onClick={openAnalyze} />
           <HudButton label="Home" onClick={goHome} />
+          <SaveButton auth={auth} />
+          <SavedButton auth={auth} onOpen={() => setSavedOpen(true)} />
           <HudButton
             label={isPlaying ? "Pause" : "Play"}
             onClick={togglePlaying}
           />
           <HudButton label="Menu" onClick={() => setMenuOpen(true)} />
+          <AuthControl auth={auth} />
         </div>
       </header>
 
@@ -362,6 +374,8 @@ export function HudFrame({ children, activeMetric }: HudFrameProps) {
           }}
         />
       )}
+
+      {savedOpen && <SavedOverlay onClose={() => setSavedOpen(false)} />}
     </div>
   );
 }

@@ -27,7 +27,9 @@ A music-translation instrument that visualizes how much meaning, emotion, cultur
 - `artifacts/api-server/src/lib/analyze/` — the analysis pipeline: `pipeline.ts` (orchestrator), `musixmatch.ts` (track + lyrics), `itunes.ts` (preview audio), `llm.ts` (shared prompt/parse + OpenAI JSON-mode path), `gemini.ts` (Gemini structured-output + embeddings path), `embeddings.ts` (back-translation drift, dispatches by provider), `fingerprint.ts` (arcs + markets), `cache.ts`, `errors.ts`, `http.ts`.
 - `artifacts/api-server/src/routes/analyze.ts` — `POST /api/analyze`, mounted in `routes/index.ts`.
 - `artifacts/resound/src/context/useResound.tsx` — holds the active `song`, `isLive`, `loadSong`, `resetToShowcase`. Every view reads the song from here.
-- `artifacts/resound/src/lib/api.ts` — client `analyzeSong()` that POSTs and re-validates the response with the shared `SongSchema`.
+- `artifacts/resound/src/lib/api.ts` — client `analyzeSong()` that POSTs and re-validates the response with the shared `SongSchema`. Also the saved-analyses client (`listSavedAnalyses`/`saveAnalysis`/`openSavedAnalysis`), all `credentials:"include"` and schema-revalidated.
+- `artifacts/api-server/src/routes/saved-analyses.ts` — `GET/POST /api/saved-analyses` + `GET /api/saved-analyses/:id`; auth-gated per-user. Save strips raw `line.source`; reopen re-fetches lyrics live by the persisted Musixmatch `track_id` (`fetchTrackById`) and merges by line index, falling back to the derived layer if the fetch fails.
+- `artifacts/resound/src/components/SavedControls.tsx` — header SAVE/SAVED/auth controls + the SAVED overlay. `lib/replit-auth-web` provides `useAuth()` (called once each in HudFrame + Landing; logged-out users still get full use, SAVE shows a "Sign in to save" hint, SAVED is hidden).
 - `artifacts/resound/src/components/AnalyzePanel.tsx` — the ANALYZE form (title/artist/target-lang, TRY quick-picks, loading step cycle, error + retry).
 - `artifacts/resound/src/fixtures/showcase.ts` — the built-in SHOWCASE song.
 
@@ -38,6 +40,8 @@ A music-translation instrument that visualizes how much meaning, emotion, cultur
 - **Same `Song` shape for showcase and live.** Views are source-agnostic — they render whatever `song` the context holds. Live results just set `isLive` and swap the song (views re-mount via `key={song.id}`).
 - **No raw-lyrics persistence.** Lyrics are fetched, analyzed, and discarded; only the assembled `Song` is cached in-memory keyed `${trackId}:${targetLang}`. All provider keys stay server-side.
 - **Errors are sanitized.** Upstream URLs (which carry the Musixmatch key) never appear in client-facing error messages; generic failures return a fixed message and log detail server-side only.
+- **Auth is optional, never a gate.** Replit Auth adds per-user saved analyses only; Analyze, Featured, and all four views work fully logged out. UI labels stay generic ("Sign in"/"Sign out").
+- **Saved analyses persist only the derived layer.** Raw `line.source` is stripped before the DB write (compliance: no raw-lyric persistence); reopen re-fetches lyric text live by the persisted Musixmatch `track_id` and merges by `line-<index>` id. Keyed unique on `userId+trackId+targetLang`.
 
 ## Product
 
