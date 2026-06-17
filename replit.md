@@ -23,7 +23,8 @@ A music-translation instrument that visualizes how much meaning, emotion, cultur
 ## Where things live
 
 - `lib/shared-types/src/index.ts` — **contract source of truth.** All domain types (`Song`, `Line`, `Fidelity`, `Market`, `Fingerprint`, `Emotion`, etc.) are Zod schemas with inferred types, plus `AnalyzeInputSchema`, `SUPPORTED_TARGET_LANGS`, and the analyze error shape. Imported by both server and client. `artifacts/resound/src/types.ts` just re-exports it.
-- `artifacts/api-server/src/lib/analyze/` — the analysis pipeline: `pipeline.ts` (orchestrator), `musixmatch.ts` (track + lyrics), `itunes.ts` (preview audio), `llm.ts` (OpenAI analysis, JSON mode), `embeddings.ts` (back-translation drift), `fingerprint.ts` (arcs + markets), `cache.ts`, `errors.ts`, `http.ts`.
+- `artifacts/api-server/src/lib/provider.ts` — `getLlmProvider()` reads `LLM_PROVIDER` (`openai` | `gemini`, default `gemini`); the analysis and embedding paths dispatch on it.
+- `artifacts/api-server/src/lib/analyze/` — the analysis pipeline: `pipeline.ts` (orchestrator), `musixmatch.ts` (track + lyrics), `itunes.ts` (preview audio), `llm.ts` (shared prompt/parse + OpenAI JSON-mode path), `gemini.ts` (Gemini structured-output + embeddings path), `embeddings.ts` (back-translation drift, dispatches by provider), `fingerprint.ts` (arcs + markets), `cache.ts`, `errors.ts`, `http.ts`.
 - `artifacts/api-server/src/routes/analyze.ts` — `POST /api/analyze`, mounted in `routes/index.ts`.
 - `artifacts/resound/src/context/useResound.tsx` — holds the active `song`, `isLive`, `loadSong`, `resetToShowcase`. Every view reads the song from here.
 - `artifacts/resound/src/lib/api.ts` — client `analyzeSong()` that POSTs and re-validates the response with the shared `SongSchema`.
@@ -48,7 +49,8 @@ _Populate as you build — explicit user instructions worth remembering across s
 
 ## Gotchas
 
-- A live analysis needs a **valid `MUSIXMATCH_API_KEY`**. An invalid key returns HTTP 502 (`error: "auth"`) on `/api/analyze` — the pipeline is wired correctly, the key just needs re-checking. `OPENAI_API_KEY` powers both the LLM analysis and embeddings.
+- A live analysis needs a **valid `MUSIXMATCH_API_KEY`**. An invalid key returns HTTP 502 (`error: "auth"`) on `/api/analyze` — the pipeline is wired correctly, the key just needs re-checking. The LLM provider is selected by `LLM_PROVIDER` (`openai` | `gemini`, default `gemini`): `gemini` uses `GEMINI_API_KEY`, `openai` uses `OPENAI_API_KEY`, each powering both analysis and embeddings.
+- **Gemini is slow.** Structured-output analysis runs ~30-42s for ~24 lines, so `ANALYSIS_TIMEOUT_MS` is 60s; near-edge values cause intermittent "Gemini timed out". Only transient HTTP (503/500/overloaded, non-quota 429) is retried — timeouts, quota, and auth are not. See the `resound-gemini-provider` memory note for the schema-400 trap and retry policy.
 - After editing server code, **restart the `artifacts/api-server` workflow** — its dev script builds once then serves the bundle, so changes aren't picked up until restart.
 - Adding a domain field is a two-touch change: update the Zod schema in `@workspace/shared-types`, then run `pnpm run typecheck:libs` before the artifacts typecheck (stale lib declarations otherwise look like missing exports).
 - Never interpolate an upstream URL into an `AnalyzeError` message — the Musixmatch key rides in the query string and error messages reach the client.

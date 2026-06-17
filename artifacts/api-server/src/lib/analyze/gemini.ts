@@ -14,7 +14,9 @@ const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 const ANALYSIS_MODEL = "gemini-2.5-flash";
 const EMBEDDING_MODEL = "gemini-embedding-001";
 
-const ANALYSIS_TIMEOUT_MS = 25000;
+// Gemini structured output is slower than OpenAI JSON mode (~24s observed for
+// ~24 lines), so the analysis call gets a wider ceiling than the OpenAI path.
+const ANALYSIS_TIMEOUT_MS = 60000;
 const EMBEDDING_TIMEOUT_MS = 15000;
 
 export function geminiConfigured(): boolean {
@@ -54,6 +56,16 @@ function sanitizeSchema(node: unknown): unknown {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
       if (!ALLOWED_SCHEMA_KEYS.has(k)) continue;
+      // The keys inside `properties` are arbitrary field names, NOT schema
+      // keywords — keep them all and only sanitize their schema values.
+      if (k === "properties" && v && typeof v === "object") {
+        const props: Record<string, unknown> = {};
+        for (const [pk, pv] of Object.entries(v as Record<string, unknown>)) {
+          props[pk] = sanitizeSchema(pv);
+        }
+        out[k] = props;
+        continue;
+      }
       out[k] = sanitizeSchema(v);
     }
     return out;
@@ -73,8 +85,10 @@ function analysisResponseSchema(): unknown {
 }
 
 interface GeminiError {
-  kind: "rate_limit" | "quota" | "auth" | "other";
+  kind: "rate_limit" | "quota" | "auth" | "overloaded" | "other";
   message: string;
+  /** Transient errors worth retrying with backoff. */
+  retriable: boolean;
 }
 
 /** Map a non-OK Gemini response body/status to a classified error. */
@@ -94,17 +108,34 @@ async function classifyGemini(res: Response): Promise<GeminiError> {
     if (/quota|billing|exceeded your current quota/i.test(statusStr)) {
       return {
         kind: "quota",
+        retriable: false,
         message:
           "Gemini quota exceeded — the API key has no remaining quota/billing.",
       };
     }
-    return { kind: "rate_limit", message: "Gemini rate limit reached." };
+    return {
+      kind: "rate_limit",
+      retriable: true,
+      message: "Gemini rate limit reached.",
+    };
   }
   if (res.status === 401 || res.status === 403) {
-    return { kind: "auth", message: "Gemini rejected the API key." };
+    return {
+      kind: "auth",
+      retriable: false,
+      message: "Gemini rejected the API key.",
+    };
+  }
+  if (res.status === 503 || res.status === 500 || /unavailable|overloaded/i.test(statusStr)) {
+    return {
+      kind: "overloaded",
+      retriable: true,
+      message: "Gemini is temporarily overloaded. Please try again.",
+    };
   }
   return {
     kind: "other",
+    retriable: false,
     message: `Gemini request failed (HTTP ${res.status}).`,
   };
 }
@@ -116,6 +147,9 @@ function throwGemini(e: GeminiError): never {
   if (e.kind === "auth") throw new AnalyzeError("auth", e.message);
   throw new AnalyzeError("analysis", e.message);
 }
+
+const sleep = (ms: number): Promise<void> =>
+  new Promise((r) => setTimeout(r, ms));
 
 interface GenerateResponse {
   candidates?: { content?: { parts?: { text?: string }[] } }[];
@@ -154,6 +188,7 @@ export async function analyzeWithGemini(
     },
   };
 
+  // One network attempt: returns the model text, or throws via throwGemini.
   const attempt = async (): Promise<string> => {
     const res = await fetchWithTimeout(
       url,
@@ -168,23 +203,51 @@ export async function analyzeWithGemini(
       ANALYSIS_TIMEOUT_MS,
       "Gemini",
     );
-    if (!res.ok) throwGemini(await classifyGemini(res));
+    if (!res.ok) {
+      const e = await classifyGemini(res);
+      // Surface a retriable marker so the loop can back off and retry.
+      if (e.retriable) {
+        const err = new AnalyzeError("rate_limit", e.message);
+        (err as { retriable?: boolean }).retriable = true;
+        throw err;
+      }
+      throwGemini(e);
+    }
     const data = (await res.json()) as GenerateResponse;
     return extractText(data);
   };
 
-  let content = await attempt();
-  try {
-    return parseAnalysis(content);
-  } catch (firstErr) {
-    // One parse-repair retry: a fresh generation often returns valid JSON.
+  // Two independent retry budgets:
+  //  - transient HTTP failures (overloaded/rate-limit, marked retriable) back
+  //    off and retry up to MAX_ATTEMPTS times;
+  //  - a malformed/invalid model response gets a single re-roll.
+  // Non-retriable HTTP (auth/quota/other) and timeouts propagate immediately.
+  const MAX_ATTEMPTS = 3;
+  let parseFailures = 0;
+  let lastErr: unknown;
+  for (let i = 0; i < MAX_ATTEMPTS; i++) {
+    let content: string;
     try {
       content = await attempt();
+    } catch (err) {
+      lastErr = err;
+      const retriable =
+        err instanceof AnalyzeError &&
+        (err as { retriable?: boolean }).retriable === true;
+      if (!retriable || i === MAX_ATTEMPTS - 1) throw err;
+      await sleep(800 * (i + 1));
+      continue;
+    }
+    try {
       return parseAnalysis(content);
-    } catch {
-      throw firstErr;
+    } catch (err) {
+      lastErr = err;
+      parseFailures += 1;
+      // Cap parse re-rolls at one (2 total parse attempts) to bound latency.
+      if (parseFailures >= 2 || i === MAX_ATTEMPTS - 1) throw err;
     }
   }
+  throw lastErr;
 }
 
 interface BatchEmbedResponse {
