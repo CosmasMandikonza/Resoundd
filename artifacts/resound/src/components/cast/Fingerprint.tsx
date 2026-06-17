@@ -2,6 +2,7 @@ import {
   Component,
   memo,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -22,12 +23,22 @@ import {
   withAlpha,
 } from "@/lib/colors";
 
+// --- Composition (single source of truth for geometry + framing) ---
 // Vertical FOV of the scene camera (kept in sync with the <Canvas camera>).
 const FOV = 42;
-// Half-extents of the three-sphere group, with a small margin, so framing can
-// guarantee every sphere stays on screen at any container aspect ratio.
-const GROUP_HALF_X = 3.6; // flank center (2.45) + radius (0.82) + margin
-const GROUP_HALF_Y = 1.7; // central radius (1.4) + margin
+// Central sphere is largest; the two equal flanks are clearly smaller (0.6R)
+// and sit symmetrically at x = ±FLANK_X around the origin.
+const CENTRAL_R = 1.4;
+const FLANK_R = +(CENTRAL_R * 0.6).toFixed(3); // ~0.84
+const FLANK_X = 2.5;
+const FLANK_Z = -0.4;
+// Margins so nothing ever touches the frame edge, even while idle-rotating.
+const MARGIN_X = 0.6;
+const MARGIN_Y = 0.45;
+// Half-extents the camera must keep in frame: widest point is a flank's outer
+// edge; tallest is the central sphere's radius.
+const GROUP_HALF_X = FLANK_X + FLANK_R + MARGIN_X;
+const GROUP_HALF_Y = CENTRAL_R + MARGIN_Y;
 
 export interface ClockState {
   tSec: number;
@@ -201,7 +212,7 @@ function Spheres({
   return (
     <group ref={groupRef}>
       <mesh position={[0, 0, 0]}>
-        <sphereGeometry args={[1.4, 64, 64]} />
+        <sphereGeometry args={[CENTRAL_R, 64, 64]} />
         <meshStandardMaterial
           ref={centralMat}
           map={tex}
@@ -211,8 +222,8 @@ function Spheres({
           metalness={0.05}
         />
       </mesh>
-      <mesh position={[-2.45, 0, -0.4]}>
-        <sphereGeometry args={[0.82, 48, 48]} />
+      <mesh position={[-FLANK_X, 0, FLANK_Z]}>
+        <sphereGeometry args={[FLANK_R, 48, 48]} />
         <meshStandardMaterial
           ref={leftMat}
           map={tex}
@@ -222,8 +233,8 @@ function Spheres({
           metalness={0.05}
         />
       </mesh>
-      <mesh position={[2.45, 0, -0.4]}>
-        <sphereGeometry args={[0.82, 48, 48]} />
+      <mesh position={[FLANK_X, 0, FLANK_Z]}>
+        <sphereGeometry args={[FLANK_R, 48, 48]} />
         <meshStandardMaterial
           ref={rightMat}
           map={tex}
@@ -243,16 +254,27 @@ function Spheres({
  * which previously clipped the flanking spheres). Recomputes on resize.
  */
 function ResponsiveFraming() {
-  const { camera, size } = useThree();
-  useEffect(() => {
-    const aspect = size.width / Math.max(1, size.height);
+  const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
+  // `size` updates whenever the canvas/container resizes (r3f drives it from a
+  // ResizeObserver), which also keeps the renderer size + camera aspect current.
+  const width = useThree((s) => s.size.width);
+  const height = useThree((s) => s.size.height);
+
+  // Lay out the camera before the first paint so the group is never briefly
+  // mis-framed. Aim at the origin looking down -z, then back the camera off far
+  // enough that BOTH the full width (flanks + radii + margin) and full height
+  // fit — taking the larger of the two required distances so nothing crops.
+  useLayoutEffect(() => {
+    const aspect = width / Math.max(1, height);
     const halfTan = Math.tan((FOV * Math.PI) / 180 / 2);
-    const distForX = GROUP_HALF_X / (halfTan * aspect);
-    const distForY = GROUP_HALF_Y / halfTan;
-    camera.position.set(0, 0, Math.max(distForX, distForY));
+    const distForWidth = GROUP_HALF_X / (halfTan * aspect);
+    const distForHeight = GROUP_HALF_Y / halfTan;
+    camera.position.set(0, 0, Math.max(distForWidth, distForHeight));
+    camera.aspect = aspect;
     camera.lookAt(0, 0, 0);
     camera.updateProjectionMatrix();
-  }, [camera, size.width, size.height]);
+  }, [camera, width, height]);
+
   return null;
 }
 
