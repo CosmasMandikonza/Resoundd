@@ -150,7 +150,17 @@ export async function analyzeWithLlm(args: {
     content = completion.choices[0]?.message?.content ?? "";
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    if (/rate limit|429/i.test(message)) {
+    const code =
+      typeof err === "object" && err !== null && "code" in err
+        ? String((err as { code?: unknown }).code ?? "")
+        : "";
+    if (/insufficient_quota/i.test(code) || /quota|billing/i.test(message)) {
+      throw new AnalyzeError(
+        "rate_limit",
+        "OpenAI quota exceeded — the API key has no remaining credit/billing.",
+      );
+    }
+    if (/rate limit|429|rate_limit_exceeded/i.test(`${code} ${message}`)) {
       throw new AnalyzeError("rate_limit", "OpenAI rate limit reached.");
     }
     if (/timed out|timeout|aborted/i.test(message)) {
