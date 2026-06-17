@@ -10,6 +10,7 @@ import RebirthView from "@/components/RebirthView";
 import WorldView from "@/components/WorldView";
 import AnalyzePanel from "@/components/AnalyzePanel";
 import { clamp01 } from "@/lib/colors";
+import type { Song } from "@/types";
 
 interface HudFrameProps {
   children?: ReactNode;
@@ -136,6 +137,46 @@ function MenuOverlay({
   );
 }
 
+function AnalyzeOverlay({
+  onClose,
+  onAnalyzed,
+}: {
+  onClose: () => void;
+  onAnalyzed: (song: Song) => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-center"
+      style={GRID_STYLE}
+      role="dialog"
+      aria-modal="true"
+      aria-label="New analysis"
+    >
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Close analyze panel"
+        className="absolute right-6 top-4 border border-line bg-transparent px-3 py-1.5 font-mono text-xs uppercase tracking-[0.16em] text-text-dim transition-colors duration-[280ms] hover:bg-surface-2 hover:text-text"
+        style={{ borderRadius: 2, transitionTimingFunction: "var(--ease)" }}
+      >
+        Close
+      </button>
+
+      <div className="flex max-h-full w-full flex-col items-center gap-10 overflow-y-auto px-6 py-20">
+        <AnalyzePanel onAnalyzed={onAnalyzed} />
+      </div>
+    </div>
+  );
+}
+
 export function HudFrame({ children, activeMetric }: HudFrameProps) {
   const {
     activeAccent,
@@ -149,6 +190,11 @@ export function HudFrame({ children, activeMetric }: HudFrameProps) {
     resonance,
     song,
     isLive,
+    source,
+    analyzeOpen,
+    openAnalyze,
+    closeAnalyze,
+    goHome,
   } = useResound();
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -211,25 +257,23 @@ export function HudFrame({ children, activeMetric }: HudFrameProps) {
           </span>
         </div>
 
-        {/* Top-center: wordmark + LIVE/SHOWCASE badge */}
+        {/* Top-center: wordmark + source label */}
         <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-3">
           <span className="text-sm uppercase tracking-[0.2em] text-text">
             RESOUND
           </span>
           <span
-            className="border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.18em]"
-            style={{
-              borderRadius: 2,
-              borderColor: isLive ? activeAccent : "var(--line)",
-              color: isLive ? activeAccent : "var(--text-faint)",
-            }}
+            className="font-mono text-[10px] uppercase tracking-[0.18em]"
+            style={{ color: source === "user" ? activeAccent : "var(--text-faint)" }}
           >
-            {isLive ? "LIVE" : "SHOWCASE"}
+            {source === "user" ? "YOUR ANALYSIS · LIVE" : "FEATURED EXAMPLE"}
           </span>
         </div>
 
-        {/* Top-right: PLAY/PAUSE + MENU */}
+        {/* Top-right: persistent nav + PLAY/PAUSE + MENU */}
         <div className="flex items-center gap-2">
+          <HudButton label="New Analysis" onClick={openAnalyze} />
+          <HudButton label="Home" onClick={goHome} />
           <HudButton
             label={isPlaying ? "Pause" : "Play"}
             onClick={togglePlaying}
@@ -306,6 +350,16 @@ export function HudFrame({ children, activeMetric }: HudFrameProps) {
             setMenuOpen(false);
           }}
           onClose={() => setMenuOpen(false)}
+        />
+      )}
+
+      {analyzeOpen && (
+        <AnalyzeOverlay
+          onClose={closeAnalyze}
+          onAnalyzed={() => {
+            setView("cast");
+            closeAnalyze();
+          }}
         />
       )}
     </div>

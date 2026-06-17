@@ -8,10 +8,17 @@ import {
 } from "react";
 import type { Emotion, Song } from "@/types";
 import showcaseSong from "@/fixtures/showcase";
+import { FEATURED } from "@/fixtures/featured";
 
 export type Metric = "meaning" | "emotion" | "culture" | "singability";
 
 export type View = "cast" | "fidelity" | "rebirth" | "world";
+
+/** Top-level route: the front door vs. the instrument. */
+export type Route = "landing" | "instrument";
+
+/** Where the active analysis came from. */
+export type Source = "featured" | "user";
 
 /** CSS-variable reference for each emotion accent (source of truth: tokens.css). */
 export const ACCENT_VAR: Record<Emotion, string> = {
@@ -43,13 +50,28 @@ interface ResoundContextValue {
   /** Resonance readout, 0..1 (defaults to 0). Shown bottom-left in the HUD. */
   resonance: number;
   setResonance: (value: number) => void;
-  /** The song currently rendered by every view (defaults to the showcase). */
+  /** The song currently rendered by every view (defaults to a featured one). */
   song: Song;
-  /** True once a live analysis result has been loaded (vs. the showcase fixture). */
+  /** Where the active analysis came from: a featured example or a user run. */
+  source: Source;
+  /** True when the active analysis is a user (live) run. Derived from source. */
   isLive: boolean;
-  /** Load a freshly-analyzed song; marks the session LIVE and resets playback. */
+  /** The top-level route. The app boots to "landing". */
+  route: Route;
+  setRoute: (route: Route) => void;
+  /** Whether the ANALYZE panel overlay is open inside the instrument. */
+  analyzeOpen: boolean;
+  openAnalyze: () => void;
+  closeAnalyze: () => void;
+  /** Entry action: route into the instrument and open the ANALYZE panel. */
+  startAnalysis: () => void;
+  /** Entry action: load a featured analysis and route into the instrument. */
+  openFeatured: (id: string) => void;
+  /** Route back to the front door. */
+  goHome: () => void;
+  /** Load a freshly-analyzed song; marks the session as a USER run. */
   loadSong: (song: Song) => void;
-  /** Return to the built-in showcase song. */
+  /** Return to the built-in showcase song (a featured example). */
   resetToShowcase: () => void;
 }
 
@@ -63,20 +85,49 @@ export function ResoundProvider({ children }: { children: ReactNode }) {
   const [view, setView] = useState<View>("cast");
   const [resonance, setResonance] = useState(0);
   const [song, setSong] = useState<Song>(showcaseSong);
-  const [isLive, setIsLive] = useState(false);
+  const [source, setSource] = useState<Source>("featured");
+  const [route, setRoute] = useState<Route>("landing");
+  const [analyzeOpen, setAnalyzeOpen] = useState(false);
+
+  const isLive = source === "user";
 
   const togglePlaying = useCallback(() => setIsPlaying((p) => !p), []);
 
   const loadSong = useCallback((next: Song) => {
     setIsPlaying(false);
     setSong(next);
-    setIsLive(true);
+    setSource("user");
   }, []);
 
   const resetToShowcase = useCallback(() => {
     setIsPlaying(false);
     setSong(showcaseSong);
-    setIsLive(false);
+    setSource("featured");
+  }, []);
+
+  const openAnalyze = useCallback(() => setAnalyzeOpen(true), []);
+  const closeAnalyze = useCallback(() => setAnalyzeOpen(false), []);
+
+  const startAnalysis = useCallback(() => {
+    setRoute("instrument");
+    setAnalyzeOpen(true);
+  }, []);
+
+  const openFeatured = useCallback((id: string) => {
+    const entry = FEATURED.find((f) => f.id === id) ?? FEATURED[0];
+    if (!entry) return;
+    setIsPlaying(false);
+    setSong(entry.song);
+    setSource("featured");
+    setView("cast");
+    setAnalyzeOpen(false);
+    setRoute("instrument");
+  }, []);
+
+  const goHome = useCallback(() => {
+    setIsPlaying(false);
+    setAnalyzeOpen(false);
+    setRoute("landing");
   }, []);
 
   const value = useMemo<ResoundContextValue>(
@@ -96,7 +147,16 @@ export function ResoundProvider({ children }: { children: ReactNode }) {
       resonance,
       setResonance,
       song,
+      source,
       isLive,
+      route,
+      setRoute,
+      analyzeOpen,
+      openAnalyze,
+      closeAnalyze,
+      startAnalysis,
+      openFeatured,
+      goHome,
       loadSong,
       resetToShowcase,
     }),
@@ -109,7 +169,15 @@ export function ResoundProvider({ children }: { children: ReactNode }) {
       view,
       resonance,
       song,
+      source,
       isLive,
+      route,
+      analyzeOpen,
+      openAnalyze,
+      closeAnalyze,
+      startAnalysis,
+      openFeatured,
+      goHome,
       loadSong,
       resetToShowcase,
     ],
