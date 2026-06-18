@@ -1,0 +1,36 @@
+Rebuild the World view (Global Release Cockpit) from scratch as a world-class, functional strategic instrument. Keep the locked design system exactly: palette (--void #001209, --surface, --line/--line-bright, --text #D0BEB6, --text-dim, emotion accents --joy/--heat/--love/--calm/--melancholy, --drained #4A4742 for lost fidelity, --risk reserved for cross-cultural risk only), fonts (Instrument Serif display, Space Grotesk UI, Space Mono uppercase 0.12em for HUD/data), 8px spacing, instrument-HUD chrome, motion cubic-bezier(0.22,1,0.36,1) 280–600ms. Keep the existing HUD chrome, the bottom view tabs (MEANING·EMOTION·CULTURE·SINGABILITY), RESONANCE readout, and provenance line (MUSIXMATCH·CYANITE·SONGSTATS). No purple/glass/rounded-pills/emoji.
+
+DATA (from the Song contract): markets:Market[] each with {country, lang, readiness:0-100, momentum, streamsDelta, streamsHistory?:number[], absoluteStreams?, subScores?:{meaning,emotion,culture,singability}, localizedPreview?:string}; the song's origin country; marketDataSource:'songstats'|'estimated'. Compute opportunityScore = round(100 * momentumNorm * (1 - readiness/100)) where momentumNorm is momentum normalized 0..1 across markets; reach (absoluteStreams) is the tiebreak and drives node size. Sort the opportunity ranking by this. The top-ranked market is the headline opportunity (drives the "LOCALIZE FIRST" callout).
+
+LAYOUT: a near-fullscreen canvas (the lens), a STRATEGY RAIL docked right (~320px), the OPPORTUNITY callout + a lens toggle [ MAP | MATRIX ] + a search field across the top.
+
+MAP LENS (the hero):
+- An abstract DOT-MATRIX world map: continents rendered as a fine field of faint dots in --line over --void (use the `dotted-map` npm package, or d3-geo with a world-110m topojson drawing a faint graticule + dotted land). Elegant, restrained, no oceans, no labels. Markets placed at real lat/long projected onto the map.
+- SIGNAL FLOWS: from the origin country, animated bezier arcs travel to each market. Particles (small dots animated along the path via getPointAtLength, or animated stroke-dashoffset) flow origin→market; flow SPEED + DENSITY + brightness = that market's real momentum (hot markets stream fast and bright in the dominant-emotion accent; dormant markets thin and slow). The headline-opportunity arc is the brightest and fastest.
+- MARKET NODES encode the decision at a glance: a radial RING = readiness, filling clockwise in the dominant-emotion accent with the unready remainder draining toward --drained (so a 54% market is visibly half-drained — consistent with the fidelity language); node PULSE rate/glow = momentum; node SIZE = reach (absoluteStreams). The headline opportunity gets a target RETICLE (crosshair) and the strongest pulse.
+- SONAR SWEEP: a slow radial sweep emanating from origin (a faint conic-gradient/arc rotating ~10s, with a soft trailing tail in the accent). As the sweep angle crosses a market, briefly brighten that node and tick its readout — like sonar surfacing opportunities. Subtle, periodic, never garish.
+
+MATRIX LENS (the strategist):
+- Axes: X = MOMENTUM (left low → right high, "Songstats"), Y = READINESS (bottom low → top high). Mono axis labels and tick values.
+- Four quadrants, faintly bounded, each labeled in Space Mono: bottom-right HIGH-MOMENTUM/LOW-READINESS = "LOCALIZE FIRST" (glowing in the accent — the money quadrant); top-right = "SHIP NOW"; top-left = "NURTURE"; bottom-left = "DEPRIORITIZE". A faint note under the title: "where to spend the localization budget."
+- The same market nodes plot by (momentum, readiness), same ring/size/pulse encoding. The headline opportunity sits in the glowing LOCALIZE FIRST corner with its reticle.
+
+THE MORPH: toggling MAP↔MATRIX animates each node from its geographic position to its matrix (x,y) and back over ~600ms with the locked easing — same node identity persists, staggered slightly so it reads as a graceful flight. Arcs/sonar fade out in MATRIX; axes/quadrants fade out in MAP.
+
+STRATEGY RAIL (functional — search + strategise):
+- A ranked list of markets by opportunityScore (highest first = localize first). Each row: country, a momentum SPARKLINE (from streamsHistory), a thin readiness bar (accent→--drained), the opportunity score, and a ▲/▼ momentum indicator with the real % (streamsDelta).
+- A SEARCH field filters both the rail and the highlighted nodes live (type a country/market). A SORT toggle switches the ranking key: OPPORTUNITY / MOMENTUM / READINESS / REACH.
+- Clicking a row FOCUSES its node (pan/zoom-to or highlight + center in MAP; spotlight in MATRIX) and opens the detail panel. Hovering a row highlights the corresponding node and vice versa (two-way linking).
+
+MARKET DETAIL (drill-down — this is the "would a label pay" moment):
+- On select, a panel shows: the readiness broken into Meaning / Emotion / Culture / Singability sub-scores for THAT market's language (small bars, accent draining to --drained); real Songstats numbers (streams, growth %, playlists, TikTok/Shazam if present); a one-line localized lyric PREVIEW for that language; and a primary CTA "GENERATE LOCALIZATION →" (wire it to switch to the Rebirth view for that language).
+
+LIVENESS / TERMINAL FEEL: a small "SONGSTATS · LIVE" indicator (or "ESTIMATED" when marketDataSource='estimated'), values that tick/count up on load, the sonar sweep, and the flows make it feel like a live operations console — Bloomberg-meets-sonar-meets-atlas, in our palette.
+
+MOTION & ACCESSIBILITY: honor prefers-reduced-motion — freeze the sonar sweep (keep a static faint ring), stop particle flow (keep static arcs), and make the morph an instant cross-fade. 
+
+PERFORMANCE: render the dot-matrix as a single SVG/canvas layer (not thousands of DOM nodes); cap particles; use requestAnimationFrame; the node set is small (≤~12 markets) so per-node React is fine. Resize-safe (recompute projection + matrix coords on container resize). 60fps target.
+
+EDGE CASES: estimated data → label "ESTIMATED", hide sparklines if no streamsHistory; missing subScores → show readiness only; single/zero markets → graceful; origin missing → default the flow source to the highest-readiness market; never crash; TypeScript compiles; all existing chrome/tabs/provenance still work.
+
+Show me the MAP lens with signal flowing from Spain to the markets, the sonar sweep lighting Brazil with its reticle, then the toggle morphing the nodes into the MATRIX with Brazil glowing in the LOCALIZE FIRST quadrant, and the rail ranking markets by opportunity with working search.

@@ -80,6 +80,12 @@ export const MarketSchema = z.object({
   streamsHistory: z.array(z.number()).optional(),
   /** Absolute streams total from Songstats, when available. */
   absoluteStreams: z.number().optional(),
+  /**
+   * A one-line sample of the localized lyric for this market's language,
+   * used in the World view market detail panel. Present only when the
+   * LLM produced a localization for this target language.
+   */
+  localizedPreview: z.string().optional(),
 });
 export type Market = z.infer<typeof MarketSchema>;
 
