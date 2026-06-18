@@ -16,6 +16,12 @@ import { computeDrift } from "./embeddings";
 import { buildFingerprint, buildMarkets } from "./fingerprint";
 import { applySongstats, fetchSongstats, isSongstatsEnabled } from "./songstats";
 import { runCyaniteAnalysis } from "./cyanite";
+import { runStemSeparation, isLalalEnabled } from "./lalal";
+import {
+  generateSungRebirth,
+  isElevenLabsEnabled,
+  buildStylePrompt,
+} from "./elevenlabs";
 
 const f01 = (n: number): number => Math.round(n) / 100;
 
@@ -147,6 +153,13 @@ export interface AnalyzeOptions {
    * and lets the client enrich via /api/enrich/cyanite.
    */
   waitForCyanite?: boolean;
+  /**
+   * When true, also run LALAL.AI stem separation + ElevenLabs sung-rebirth
+   * generation inline before returning. Only used by /api/precompute so featured
+   * songs arrive with stems and a pre-generated vocal. Live songs generate TTS
+   * on demand via /api/rebirth/generate.
+   */
+  waitForRebirth?: boolean;
 }
 
 /** Full analysis pipeline: resolve -> lyrics -> (preview ‖ LLM ‖ Songstats) -> drift -> assemble. */
@@ -296,6 +309,38 @@ export async function analyzeSong(
     }
   }
 
+  // For precompute/featured, also run LALAL stem separation and ElevenLabs sung
+  // rebirth so the featured Rebirth view plays instantly without user action.
+  // Both are best-effort: any failure leaves the song without stems/rebirthAudio
+  // and the frontend falls back gracefully. Run in parallel.
+  if (options.waitForRebirth) {
+    const trackIdStr = String(track.trackId);
+    const [stems, rebirthUrl] = await Promise.all([
+      isLalalEnabled() && song.previewUrl
+        ? runStemSeparation(song.previewUrl, trackIdStr, log)
+        : Promise.resolve(null),
+      isElevenLabsEnabled()
+        ? generateSungRebirth(
+            song.lines.map((l) => l.localized),
+            buildStylePrompt(song.cyaniteSummary),
+            song.id,
+            log,
+          )
+        : Promise.resolve(null),
+    ]);
+
+    if (stems) {
+      song.stems = stems;
+      if (!song.partnersUsed.includes("LALAL")) song.partnersUsed.push("LALAL");
+    }
+    if (rebirthUrl) {
+      song.rebirthAudioUrl = rebirthUrl;
+      song.rebirthSource = "elevenmusic";
+      if (!song.partnersUsed.includes("ELEVENLABS"))
+        song.partnersUsed.push("ELEVENLABS");
+    }
+  }
+
   const validated = SongSchema.safeParse(song);
   if (!validated.success) {
     throw new AnalyzeError(
@@ -317,7 +362,7 @@ export async function analyzeSongForFeatured(
   input: AnalyzeInput,
   log: Logger,
 ): Promise<AnalyzeResult> {
-  return analyzeSong(input, log, { waitForCyanite: true });
+  return analyzeSong(input, log, { waitForCyanite: true, waitForRebirth: true });
 }
 
 export { isSongstatsEnabled };

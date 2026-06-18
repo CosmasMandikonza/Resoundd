@@ -5,6 +5,7 @@ import authRouter from "./auth";
 import savedAnalysesRouter from "./saved-analyses";
 import enrichRouter from "./enrich";
 import featuredRouter from "./featured";
+import rebirthRouter from "./rebirth";
 
 const router: IRouter = Router();
 
@@ -14,5 +15,6 @@ router.use(authRouter);
 router.use(savedAnalysesRouter);
 router.use(enrichRouter);
 router.use(featuredRouter);
+router.use(rebirthRouter);
 
 export default router;

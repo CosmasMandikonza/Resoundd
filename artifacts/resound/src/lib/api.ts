@@ -2,11 +2,13 @@ import {
   SongSchema,
   SavedAnalysisSummarySchema,
   CyaniteEnrichResultSchema,
+  RebirthGenerateResultSchema,
   type AnalyzeInput,
   type AnalyzeErrorBody,
   type CyaniteEnrichResult,
   type SavedAnalysisSummary,
   type Song,
+  type RebirthGenerateResult,
 } from "@/types";
 
 /** A typed failure thrown by analyzeSong, carrying the machine-readable kind. */
@@ -218,4 +220,32 @@ export async function openSavedAnalysis(id: string): Promise<Song> {
     throw new SavedRequestError("internal", "The reopened song was malformed.");
   }
   return parsed.data;
+}
+
+const REBIRTH_GENERATE_ENDPOINT = `${import.meta.env.BASE_URL}api/rebirth/generate`;
+
+/**
+ * Generate a rebirth vocal for a live song on demand.
+ *
+ * Returns the validated result on success, or `null` on any failure (missing
+ * key, generation error, network) so the caller can surface a graceful
+ * "unavailable" state rather than crashing.
+ */
+export async function generateRebirth(input: {
+  songId: string;
+  targetLang: string;
+  lyrics: string[];
+}): Promise<RebirthGenerateResult | null> {
+  try {
+    const res = await fetch(REBIRTH_GENERATE_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) return null;
+    const parsed = RebirthGenerateResultSchema.safeParse(await res.json());
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
 }

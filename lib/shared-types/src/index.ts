@@ -121,6 +121,21 @@ export const CyaniteSummarySchema = z.object({
 });
 export type CyaniteSummary = z.infer<typeof CyaniteSummarySchema>;
 
+/**
+ * LALAL.AI stem separation result. Both URLs point to the API server's
+ * /api/media route so they are served with proper CORS headers for the
+ * Web Audio API AnalyserNode.
+ */
+export const StemsSchema = z.object({
+  instrumentalUrl: z.string(),
+  vocalUrl: z.string(),
+});
+export type Stems = z.infer<typeof StemsSchema>;
+
+/** How the reborn vocal was generated. */
+export const RebirthSourceSchema = z.enum(["elevenmusic", "tts"]);
+export type RebirthSource = z.infer<typeof RebirthSourceSchema>;
+
 export const SongSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -134,6 +149,18 @@ export const SongSchema = z.object({
   /** Audio for the reborn (localized, singable) rendering. */
   rebirthAudioUrl: z.string(),
   rebirthOffsetMs: z.number(),
+  /**
+   * LALAL.AI stem-separated audio files (derived from the iTunes 30s preview).
+   * Present only when LALAL_LICENSE_KEY is set and stem separation succeeded.
+   * Both URLs are served by our backend with CORS headers.
+   */
+  stems: StemsSchema.optional(),
+  /**
+   * How the reborn vocal was generated. `elevenmusic` = ElevenLabs sung via
+   * precompute; `tts` = ElevenLabs multilingual TTS triggered on demand by the
+   * user; absent when no rebirth audio has been generated.
+   */
+  rebirthSource: RebirthSourceSchema.optional(),
   lines: z.array(LineSchema),
   fingerprint: FingerprintSchema,
   overallFidelity: FidelitySchema,
@@ -228,6 +255,28 @@ export const CyaniteEnrichInputSchema = z.object({
   targetLang: TargetLangSchema.optional(),
 });
 export type CyaniteEnrichInput = z.infer<typeof CyaniteEnrichInputSchema>;
+
+/**
+ * Request body for POST /api/rebirth/generate.
+ * The client sends the localized lines for a live song; the server runs
+ * ElevenLabs TTS and returns a servable audio URL. Credit-gated: only
+ * triggered by an explicit user action ("GENERATE REBIRTH").
+ */
+export const RebirthGenerateInputSchema = z.object({
+  /** Localized (reborn) lyric lines, joined server-side for TTS. */
+  lyrics: z.array(z.string()).min(1).max(120),
+  targetLang: TargetLangSchema,
+  /** Stable key used to name the generated audio file (e.g. song id). */
+  songId: z.string().min(1).max(200),
+});
+export type RebirthGenerateInput = z.infer<typeof RebirthGenerateInputSchema>;
+
+/** Response of POST /api/rebirth/generate. */
+export const RebirthGenerateResultSchema = z.object({
+  rebirthAudioUrl: z.string(),
+  rebirthSource: RebirthSourceSchema,
+});
+export type RebirthGenerateResult = z.infer<typeof RebirthGenerateResultSchema>;
 
 /** Machine-readable failure kinds surfaced by the analyze pipeline. */
 export const ANALYZE_ERROR_KINDS = [

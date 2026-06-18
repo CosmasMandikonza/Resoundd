@@ -11,7 +11,7 @@ import {
 import type { Emotion, Song } from "@/types";
 import showcaseSong from "@/fixtures/showcase";
 import { FEATURED, type FeaturedEntry } from "@/fixtures/featured";
-import { enrichCyanite, listFeatured } from "@/lib/api";
+import { enrichCyanite, generateRebirth as generateRebirthApi, listFeatured } from "@/lib/api";
 
 /** Recover the Musixmatch track id from a `song-<trackId>-<targetLang>` id. */
 function trackIdFromSong(song: Song): string {
@@ -87,6 +87,21 @@ interface ResoundContextValue {
   loadSong: (song: Song) => void;
   /** Return to the built-in showcase song (a featured example). */
   resetToShowcase: () => void;
+  /**
+   * Merge `partial` into the active song without changing its source. Used by
+   * async enrichment paths (Cyanite arc, Rebirth audio) that patch the song
+   * after the initial analysis returns.
+   */
+  patchSong: (partial: Partial<Song>) => void;
+  /** True while a rebirth vocal is being generated for the active live song. */
+  isGeneratingRebirth: boolean;
+  /**
+   * Trigger on-demand ElevenLabs TTS generation for a live song. No-op for
+   * featured songs or when generation is already in progress. Patches the song
+   * with the resulting URL on success; resolves silently on failure so the view
+   * can show its own "unavailable" state.
+   */
+  generateRebirth: () => Promise<void>;
 }
 
 const ResoundContext = createContext<ResoundContextValue | null>(null);
@@ -103,11 +118,14 @@ export function ResoundProvider({ children }: { children: ReactNode }) {
   const [route, setRoute] = useState<Route>("landing");
   const [analyzeOpen, setAnalyzeOpen] = useState(false);
   const [featured, setFeatured] = useState<FeaturedEntry[]>(FEATURED);
+  const [isGeneratingRebirth, setIsGeneratingRebirth] = useState(false);
 
   const isLive = source === "user";
 
   /** Id of the song currently displayed, so a stale async enrich is ignored. */
   const activeSongId = useRef(song.id);
+  /** Guards against concurrent rebirth generation requests. */
+  const generatingRebirthRef = useRef(false);
 
   // Load the precomputed featured gallery from the server; keep the built-in
   // fixture if the server has none or the request fails.
@@ -154,6 +172,10 @@ export function ResoundProvider({ children }: { children: ReactNode }) {
           : current,
       );
     });
+  }, []);
+
+  const patchSong = useCallback((partial: Partial<Song>) => {
+    setSong((current) => ({ ...current, ...partial }));
   }, []);
 
   const loadSong = useCallback(
@@ -203,6 +225,37 @@ export function ResoundProvider({ children }: { children: ReactNode }) {
     setRoute("landing");
   }, []);
 
+  const generateRebirth = useCallback(async () => {
+    if (!isLive || generatingRebirthRef.current) return;
+    generatingRebirthRef.current = true;
+    setIsGeneratingRebirth(true);
+    const currentSong = song;
+    try {
+      const result = await generateRebirthApi({
+        songId: currentSong.id,
+        targetLang: currentSong.targetLang,
+        lyrics: currentSong.lines.map((l) => l.localized),
+      });
+      if (result && activeSongId.current === currentSong.id) {
+        setSong((s) =>
+          s.id === currentSong.id
+            ? {
+                ...s,
+                rebirthAudioUrl: result.rebirthAudioUrl,
+                rebirthSource: result.rebirthSource,
+                partnersUsed: s.partnersUsed.includes("ELEVENLABS")
+                  ? s.partnersUsed
+                  : [...s.partnersUsed, "ELEVENLABS"],
+              }
+            : s,
+        );
+      }
+    } finally {
+      generatingRebirthRef.current = false;
+      setIsGeneratingRebirth(false);
+    }
+  }, [isLive, song]);
+
   const value = useMemo<ResoundContextValue>(
     () => ({
       activeAccent: ACCENT_VAR[activeEmotion],
@@ -233,6 +286,9 @@ export function ResoundProvider({ children }: { children: ReactNode }) {
       goHome,
       loadSong,
       resetToShowcase,
+      patchSong,
+      isGeneratingRebirth,
+      generateRebirth,
     }),
     [
       activeEmotion,
@@ -255,6 +311,9 @@ export function ResoundProvider({ children }: { children: ReactNode }) {
       goHome,
       loadSong,
       resetToShowcase,
+      patchSong,
+      isGeneratingRebirth,
+      generateRebirth,
     ],
   );
 

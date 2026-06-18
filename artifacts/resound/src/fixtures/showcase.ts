@@ -405,6 +405,11 @@ export const showcaseSong: Song = {
   durationMs: 75000,
   rebirthAudioUrl: "/audio/placeholder-rebirth.mp3",
   rebirthOffsetMs: 0,
+  rebirthSource: "elevenmusic",
+  stems: {
+    instrumentalUrl: "/audio/placeholder-instrumental.mp3",
+    vocalUrl: "/audio/placeholder-vocal.mp3",
+  },
   lines,
   fingerprint: { sourceArc, translationArc },
   overallFidelity: {

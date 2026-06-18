@@ -1,0 +1,25 @@
+Milestone 3: integrate ElevenLabs and LALAL.AI as the engine of the Rebirth view — the reborn localized vocal sung/spoken over the ORIGINAL isolated instrumental. Extend the pipeline and contract; keep all views working. Server-side keys. Confirm exact endpoints in the partner docs (ElevenLabs: elevenlabs.io/docs; LALAL: lalal.ai API docs).
+
+CONTRACT EXTENSIONS:
+- Song: add rebirthAudioUrl?:string (the reborn vocal), stems?:{instrumentalUrl:string,vocalUrl:string}, rebirthSource?:'elevenmusic'|'tts'. partnersUsed += as used.
+
+LALAL (stem separation — isolate the original's instrumental so the rebirth plays over the real track):
+- REST, server-side, LALAL_LICENSE_KEY. Flow: upload the iTunes preview audio → request a split into vocals + instrumental (the splitter; confirm stem params) → poll until done → get stem URLs. Download the instrumental + vocal and store them SERVABLE from our backend (a /public dir or object storage) → song.stems={instrumentalUrl,vocalUrl}. (Stems are derived from the 30s preview; keep to featured + the preview length.)
+
+ELEVENLABS (the reborn vocal):
+- REST, server-side, ELEVENLABS_API_KEY. Generate a reborn version of the LOCALIZED lyrics:
+  * FEATURED songs (pre-generated, instant): use Eleven Music to SING the localized lyrics, passing a style prompt derived from cyaniteSummary (e.g. genre + mood + BPM, "reggaeton, intimate, 90 BPM") so it matches the song. Async/long → run during /api/precompute, store the audio servable → rebirthAudioUrl, rebirthSource='elevenmusic'.
+  * LIVE songs (on demand): a "GENERATE REBIRTH" button triggers generation with a loading state. To conserve credits and stay fast, default the live path to expressive multilingual Text-to-Speech of the localized lyrics in the target language (rebirthSource='tts'); offer Eleven Music sung generation as an explicit, credits-guarded option. Store the result servable.
+
+PRE-COMPUTE: extend /api/precompute to also run LALAL (stems) + ElevenLabs (sung reborn) for the featured list and persist the URLs, so featured Rebirth plays instantly over the real instrumental.
+
+FRONTEND — the Rebirth view as a wow audio moment, both partners visible:
+- STEM SEPARATION (LALAL), the deconstruction: on entering Rebirth (or a "DECONSTRUCT" control), visualize the original splitting into two stems — animate a single waveform/the fingerprint separating into a VOCAL layer and an INSTRUMENTAL layer (a satisfying split), labeled "LALAL.AI · STEM SEPARATION". This sets up the rebirth and showcases a deep LALAL use.
+- THE REBIRTH (ElevenLabs + LALAL together): "HEAR THE REBIRTH" plays the ElevenLabs reborn vocal (rebirthAudioUrl) OVER the LALAL instrumental (stems.instrumentalUrl) — two synced <audio> elements started together. As it plays:
+  * the localized lyrics highlight in sync;
+  * AUDIO-REACTIVE visual: since the reborn audio is OUR file served by us, attach a Web Audio API AnalyserNode (crossOrigin='anonymous'; serve the audio with CORS headers) and drive a real-time visualization — the fingerprint sphere pulses to the vocal and a live waveform renders in the current emotion accent. This is the one place real audio reactivity belongs; make it beautiful.
+  * labels: "ELEVENLABS · REBORN VOCAL" and "LALAL.AI · INSTRUMENTAL".
+- A/B TOGGLE: switch between ORIGINAL (the iTunes preview) and REBORN (reborn vocal over instrumental) so a judge hears "carry it across" directly.
+- LIVE: "GENERATE REBIRTH" → loading → plays when ready (credits-guarded; TTS default, Eleven Music optional). FEATURED: instant (pre-generated).
+
+EDGE CASES: LALAL + ElevenLabs are async — use jobs with polling, designed loading states, and timeouts; credits guards (never auto-generate on every live request — gate behind the explicit button; pre-gen featured); two-audio sync (start together, correct for drift, single play/pause); AnalyserNode CORS (serve our audio with Access-Control-Allow-Origin and set crossOrigin on the element); autoplay (user gesture only); missing instrumental → vocal-only or follow-along fallback; generation failure → fall back to TTS then to the follow-along text, never crash; store all audio servable; contract intact; TypeScript compiles. Show me a featured song's Rebirth: the stems split, then the reborn vocal plays over the real instrumental with the sphere pulsing to it and the lyrics highlighting.

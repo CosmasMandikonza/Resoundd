@@ -4,3 +4,5 @@
 - [Resound landing isolation](resound-landing.md) — edit-landing-only: sphere replicates Fingerprint wash; gsap/lenis are devDeps (not in catalog); scroll motion gated on prefers-reduced-motion.
 - [Resound saved analyses + optional auth](resound-saved-analyses.md) — derived-only persistence (strip raw line.source), reopen re-fetches by Musixmatch track_id not title/artist, optional-auth wiring + composite-lib gotcha.
 - [Resound partner integrations](resound-partners-milestone2.md) — Cyanite async/Songstats inline w/ silent fallback; precompute cache-gating trap; SSRF chokepoint; PRECOMPUTE_TOKEN gate (unset=403 by design).
+- [Resound API route path convention](resound-route-paths.md) — the shared proxy strips the /api prefix before forwarding; express routes must use SHORT paths (e.g. /rebirth/generate, not /api/rebirth/generate).
+- [Resound M3 Rebirth engine](resound-m3-rebirth.md) — LALAL.AI stems + ElevenLabs TTS; media store at /tmp/resound-media; Web Audio AnalyserNode needs crossOrigin=anonymous + CORS headers.
