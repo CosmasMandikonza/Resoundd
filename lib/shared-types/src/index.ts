@@ -73,6 +73,13 @@ export const MarketSchema = z.object({
   streamsDelta: z.number(),
   momentum: z.enum(["high", "rising", "flat"]),
   risk: z.string().optional(),
+  /**
+   * Trailing streams trend (oldest → newest) for a sparkline. Present only when
+   * real Songstats market data is available (otherwise the market is estimated).
+   */
+  streamsHistory: z.array(z.number()).optional(),
+  /** Absolute streams total from Songstats, when available. */
+  absoluteStreams: z.number().optional(),
 });
 export type Market = z.infer<typeof MarketSchema>;
 
@@ -91,6 +98,28 @@ export type TimingLevel = z.infer<typeof TimingLevelSchema>;
 /** Whether the translation is an official one or model-generated. */
 export const TranslationSourceSchema = z.enum(["official", "generated"]);
 export type TranslationSource = z.infer<typeof TranslationSourceSchema>;
+
+/**
+ * Where the source emotional arc came from. `cyanite` means the arc is derived
+ * from real audio emotion analysis; `lyric` means it falls back to the
+ * LLM/lyric-derived arc (Cyanite unavailable, still processing, or it failed).
+ */
+export const EmotionSourceSchema = z.enum(["cyanite", "lyric"]);
+export type EmotionSource = z.infer<typeof EmotionSourceSchema>;
+
+/** Where per-market numbers came from: real Songstats data, or estimated. */
+export const MarketDataSourceSchema = z.enum(["songstats", "estimated"]);
+export type MarketDataSource = z.infer<typeof MarketDataSourceSchema>;
+
+/** Compact audio-emotion summary from Cyanite (valence/arousal are 0..1). */
+export const CyaniteSummarySchema = z.object({
+  moodTags: z.array(z.string()),
+  valence: z.number(),
+  arousal: z.number(),
+  /** Coarse energy descriptor reported by Cyanite (e.g. "high"). */
+  energy: z.string(),
+});
+export type CyaniteSummary = z.infer<typeof CyaniteSummarySchema>;
 
 export const SongSchema = z.object({
   id: z.string(),
@@ -120,6 +149,17 @@ export const SongSchema = z.object({
   lyricsRestricted: z.boolean().optional(),
   /** Lyric copyright / attribution string from the provider, when available. */
   copyright: z.string().optional(),
+  /**
+   * Provenance of the source emotional arc. Defaults to `lyric`; an async
+   * Cyanite enrichment swaps the arc and flips this to `cyanite`.
+   */
+  emotionSource: EmotionSourceSchema.default("lyric"),
+  /** Audio-emotion summary from Cyanite, present once enrichment succeeds. */
+  cyaniteSummary: CyaniteSummarySchema.optional(),
+  /** Provenance of the per-market numbers. */
+  marketDataSource: MarketDataSourceSchema.default("estimated"),
+  /** Data partners that contributed to this analysis (e.g. ["MUSIXMATCH"]). */
+  partnersUsed: z.array(z.string()).default([]),
 });
 export type Song = z.infer<typeof SongSchema>;
 
@@ -167,6 +207,27 @@ export const SavedAnalysisSummarySchema = z.object({
   savedAt: z.string(),
 });
 export type SavedAnalysisSummary = z.infer<typeof SavedAnalysisSummarySchema>;
+
+/**
+ * Response of POST /api/enrich/cyanite. When `emotionSource` is `cyanite` the
+ * client swaps `sourceArc` into the song's fingerprint and stores
+ * `cyaniteSummary`; when it is `lyric` the enrichment was unavailable/failed and
+ * the client keeps the existing lyric-derived arc (silent fallback).
+ */
+export const CyaniteEnrichResultSchema = z.object({
+  emotionSource: EmotionSourceSchema,
+  sourceArc: z.array(ArcPointSchema).optional(),
+  cyaniteSummary: CyaniteSummarySchema.optional(),
+});
+export type CyaniteEnrichResult = z.infer<typeof CyaniteEnrichResultSchema>;
+
+/** Request body for POST /api/enrich/cyanite. */
+export const CyaniteEnrichInputSchema = z.object({
+  trackId: z.string().min(1).max(120),
+  previewUrl: z.string().url(),
+  targetLang: TargetLangSchema.optional(),
+});
+export type CyaniteEnrichInput = z.infer<typeof CyaniteEnrichInputSchema>;
 
 /** Machine-readable failure kinds surfaced by the analyze pipeline. */
 export const ANALYZE_ERROR_KINDS = [

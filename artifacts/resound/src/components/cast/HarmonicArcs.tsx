@@ -8,7 +8,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { curveCatmullRom, line as d3Line } from "d3-shape";
-import type { ArcPoint, Line } from "@/types";
+import type { ArcPoint, EmotionSource, Line } from "@/types";
 import { clamp01, lerpColor } from "@/lib/colors";
 
 const VB_W = 1000;
@@ -31,6 +31,23 @@ interface Props {
   currentLine: Line | null;
   accent: string;
   drained: string;
+  /**
+   * Provenance of the source arc. When `cyanite` the top curve is the REAL
+   * audio-felt emotion, so we emphasise it and the divergence band glows as the
+   * "Emotion Fidelity" gap; otherwise both arcs are lyric-derived.
+   */
+  emotionSource: EmotionSource;
+}
+
+/** Mean vertical gap between the two arcs (0..1), i.e. emotion drift. */
+function arcDivergence(source: ArcPoint[], translation: ArcPoint[]): number {
+  const n = Math.min(source.length, translation.length);
+  if (n === 0) return 0;
+  let sum = 0;
+  for (let i = 0; i < n; i++) {
+    sum += Math.abs(clamp01(source[i].valence) - clamp01(translation[i].valence));
+  }
+  return sum / n;
 }
 
 function pointXY(p: ArcPoint): [number, number] {
@@ -76,7 +93,13 @@ export function HarmonicArcs({
   currentLine,
   accent,
   drained,
+  emotionSource,
 }: Props) {
+  const isCyanite = emotionSource === "cyanite";
+  const emotionFidelity = useMemo(
+    () => 1 - arcDivergence(sourceArc, translationArc),
+    [sourceArc, translationArc],
+  );
   const [sliderFrac, setSliderFrac] = useState(1);
   const [mounted, setMounted] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -185,25 +208,42 @@ export function HarmonicArcs({
                 height={VB_H}
               />
             </clipPath>
+            <filter id="resound-arc-glow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="3.2" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
           </defs>
 
-          {/* Divergence shading (only within the revealed region). */}
+          {/* Divergence shading (only within the revealed region). When the
+              source arc is real audio emotion (Cyanite), this band is the
+              Emotion Fidelity gap — make it glow. */}
           <path
             d={divergeD}
             fill={accent}
-            opacity={0.08}
+            opacity={isCyanite ? 0.16 : 0.08}
             clipPath="url(#resound-reveal-clip)"
+            style={
+              isCyanite ? { filter: "url(#resound-arc-glow)" } : undefined
+            }
           />
 
-          {/* Source arc — always visible. */}
+          {/* Source arc — always visible. Emphasised when it is the real
+              Cyanite audio-emotion curve. */}
           <path
             d={sourceD}
             fill="none"
             stroke={accent}
-            strokeWidth={1.5}
+            strokeWidth={isCyanite ? 2.4 : 1.5}
             vectorEffect="non-scaling-stroke"
             pathLength={1}
-            style={drawStyle}
+            style={
+              isCyanite
+                ? { ...drawStyle, filter: "url(#resound-arc-glow)" }
+                : drawStyle
+            }
           />
 
           {/* Translation arc — wiped in by the slider, color drained by fidelity. */}
@@ -248,6 +288,25 @@ export function HarmonicArcs({
             backgroundColor: "var(--line-bright)",
           }}
         />
+
+        {/* Emotion Fidelity legend — only meaningful when the source arc is the
+            real Cyanite audio-emotion curve. */}
+        {isCyanite && (
+          <div className="pointer-events-none absolute right-0 top-0 flex flex-col items-end gap-1">
+            <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-text-faint">
+              Emotion Fidelity
+            </span>
+            <span
+              className="font-mono text-lg leading-none tabular-nums"
+              style={{ color: accent }}
+            >
+              {Math.round(emotionFidelity * 100)}
+            </span>
+            <span className="font-mono text-[8px] uppercase tracking-[0.16em] text-text-faint">
+              audio vs. translation
+            </span>
+          </div>
+        )}
 
         {/* Border slider (pointer + keyboard). */}
         <div

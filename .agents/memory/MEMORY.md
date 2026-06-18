@@ -3,3 +3,4 @@
 - [Resound Gemini provider](resound-gemini-provider.md) — Gemini schema 400 trap, ~30-42s latency / 60s timeout, retry-only-transient policy, per-process cache caveat.
 - [Resound landing isolation](resound-landing.md) — edit-landing-only: sphere replicates Fingerprint wash; gsap/lenis are devDeps (not in catalog); scroll motion gated on prefers-reduced-motion.
 - [Resound saved analyses + optional auth](resound-saved-analyses.md) — derived-only persistence (strip raw line.source), reopen re-fetches by Musixmatch track_id not title/artist, optional-auth wiring + composite-lib gotcha.
+- [Resound partner integrations](resound-partners-milestone2.md) — Cyanite async/Songstats inline w/ silent fallback; precompute cache-gating trap; SSRF chokepoint; PRECOMPUTE_TOKEN gate (unset=403 by design).

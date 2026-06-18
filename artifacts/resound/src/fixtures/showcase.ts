@@ -297,6 +297,8 @@ const markets: Market[] = [
     fidelity: { meaning: 1, emotion: 1, culture: 1, singability: 1 },
     streamsDelta: 3,
     momentum: "flat",
+    streamsHistory: [820, 835, 841, 838, 852, 860, 866, 871],
+    absoluteStreams: 12_400_000,
   },
   {
     id: "br",
@@ -313,6 +315,8 @@ const markets: Market[] = [
     },
     streamsDelta: 34,
     momentum: "high",
+    streamsHistory: [120, 138, 159, 188, 221, 268, 312, 372],
+    absoluteStreams: 4_900_000,
     risk: "Reggaetón slang lands differently against Brazilian funk culture — \"perreo\" has no clean Portuguese equivalent and can read as crude.",
   },
   {
@@ -330,6 +334,8 @@ const markets: Market[] = [
     },
     streamsDelta: 18,
     momentum: "rising",
+    streamsHistory: [410, 422, 439, 451, 470, 488, 503, 524],
+    absoluteStreams: 7_100_000,
   },
   {
     id: "us",
@@ -346,6 +352,8 @@ const markets: Market[] = [
     },
     streamsDelta: 12,
     momentum: "rising",
+    streamsHistory: [1180, 1205, 1224, 1238, 1261, 1290, 1312, 1322],
+    absoluteStreams: 18_600_000,
   },
   {
     id: "de",
@@ -362,6 +370,8 @@ const markets: Market[] = [
     },
     streamsDelta: 4,
     momentum: "flat",
+    streamsHistory: [640, 648, 651, 649, 655, 662, 668, 671],
+    absoluteStreams: 9_300_000,
   },
   {
     id: "jp",
@@ -378,6 +388,8 @@ const markets: Market[] = [
     },
     streamsDelta: 9,
     momentum: "rising",
+    streamsHistory: [288, 295, 301, 309, 318, 326, 333, 339],
+    absoluteStreams: 5_400_000,
   },
 ];
 
@@ -410,6 +422,15 @@ export const showcaseSong: Song = {
   markets,
   timingLevel: "line",
   translationSource: "official",
+  emotionSource: "cyanite",
+  cyaniteSummary: {
+    moodTags: ["sensual", "energetic", "warm", "danceable"],
+    valence: 0.68,
+    arousal: 0.79,
+    energy: "high",
+  },
+  marketDataSource: "songstats",
+  partnersUsed: ["MUSIXMATCH", "CYANITE", "SONGSTATS"],
 };
 
 export default showcaseSong;

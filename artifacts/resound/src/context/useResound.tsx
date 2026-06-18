@@ -2,13 +2,25 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import type { Emotion, Song } from "@/types";
 import showcaseSong from "@/fixtures/showcase";
-import { FEATURED } from "@/fixtures/featured";
+import { FEATURED, type FeaturedEntry } from "@/fixtures/featured";
+import { enrichCyanite, listFeatured } from "@/lib/api";
+
+/** Recover the Musixmatch track id from a `song-<trackId>-<targetLang>` id. */
+function trackIdFromSong(song: Song): string {
+  const suffix = `-${song.targetLang}`;
+  if (song.id.startsWith("song-") && song.id.endsWith(suffix)) {
+    return song.id.slice("song-".length, song.id.length - suffix.length);
+  }
+  return song.id;
+}
 
 export type Metric = "meaning" | "emotion" | "culture" | "singability";
 
@@ -52,6 +64,8 @@ interface ResoundContextValue {
   setResonance: (value: number) => void;
   /** The song currently rendered by every view (defaults to a featured one). */
   song: Song;
+  /** The featured gallery (server-precomputed, falling back to the fixture). */
+  featured: FeaturedEntry[];
   /** Where the active analysis came from: a featured example or a user run. */
   source: Source;
   /** True when the active analysis is a user (live) run. Derived from source. */
@@ -88,19 +102,74 @@ export function ResoundProvider({ children }: { children: ReactNode }) {
   const [source, setSource] = useState<Source>("featured");
   const [route, setRoute] = useState<Route>("landing");
   const [analyzeOpen, setAnalyzeOpen] = useState(false);
+  const [featured, setFeatured] = useState<FeaturedEntry[]>(FEATURED);
 
   const isLive = source === "user";
 
+  /** Id of the song currently displayed, so a stale async enrich is ignored. */
+  const activeSongId = useRef(song.id);
+
+  // Load the precomputed featured gallery from the server; keep the built-in
+  // fixture if the server has none or the request fails.
+  useEffect(() => {
+    let cancelled = false;
+    void listFeatured().then((items) => {
+      if (!cancelled && items.length > 0) setFeatured(items);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const togglePlaying = useCallback(() => setIsPlaying((p) => !p), []);
 
-  const loadSong = useCallback((next: Song) => {
-    setIsPlaying(false);
-    setSong(next);
-    setSource("user");
+  /**
+   * Fire the async Cyanite audio-emotion enrichment for a freshly-loaded song
+   * and swap the real arc in when it returns — but only if the same song is
+   * still on screen (guards against a newer analysis having replaced it).
+   */
+  const enrich = useCallback((next: Song) => {
+    if (next.emotionSource === "cyanite" || !next.previewUrl) return;
+    void enrichCyanite({
+      trackId: trackIdFromSong(next),
+      previewUrl: next.previewUrl,
+      targetLang: next.targetLang,
+    }).then((result) => {
+      if (result.emotionSource !== "cyanite" || !result.sourceArc) return;
+      if (activeSongId.current !== next.id) return;
+      setSong((current) =>
+        current.id === next.id
+          ? {
+              ...current,
+              emotionSource: "cyanite",
+              cyaniteSummary: result.cyaniteSummary,
+              fingerprint: {
+                ...current.fingerprint,
+                sourceArc: result.sourceArc!,
+              },
+              partnersUsed: current.partnersUsed.includes("CYANITE")
+                ? current.partnersUsed
+                : [...current.partnersUsed, "CYANITE"],
+            }
+          : current,
+      );
+    });
   }, []);
+
+  const loadSong = useCallback(
+    (next: Song) => {
+      setIsPlaying(false);
+      activeSongId.current = next.id;
+      setSong(next);
+      setSource("user");
+      enrich(next);
+    },
+    [enrich],
+  );
 
   const resetToShowcase = useCallback(() => {
     setIsPlaying(false);
+    activeSongId.current = showcaseSong.id;
     setSong(showcaseSong);
     setSource("featured");
   }, []);
@@ -113,16 +182,20 @@ export function ResoundProvider({ children }: { children: ReactNode }) {
     setAnalyzeOpen(true);
   }, []);
 
-  const openFeatured = useCallback((id: string) => {
-    const entry = FEATURED.find((f) => f.id === id) ?? FEATURED[0];
-    if (!entry) return;
-    setIsPlaying(false);
-    setSong(entry.song);
-    setSource("featured");
-    setView("cast");
-    setAnalyzeOpen(false);
-    setRoute("instrument");
-  }, []);
+  const openFeatured = useCallback(
+    (id: string) => {
+      const entry = featured.find((f) => f.id === id) ?? featured[0];
+      if (!entry) return;
+      setIsPlaying(false);
+      activeSongId.current = entry.song.id;
+      setSong(entry.song);
+      setSource("featured");
+      setView("cast");
+      setAnalyzeOpen(false);
+      setRoute("instrument");
+    },
+    [featured],
+  );
 
   const goHome = useCallback(() => {
     setIsPlaying(false);
@@ -147,6 +220,7 @@ export function ResoundProvider({ children }: { children: ReactNode }) {
       resonance,
       setResonance,
       song,
+      featured,
       source,
       isLive,
       route,
@@ -169,6 +243,7 @@ export function ResoundProvider({ children }: { children: ReactNode }) {
       view,
       resonance,
       song,
+      featured,
       source,
       isLive,
       route,

@@ -222,6 +222,10 @@ export function HudFrame({ children, activeMetric }: HudFrameProps) {
     .toFixed(1)
     .padStart(4, "0")}%`;
 
+  // Data-partner provenance line, e.g. "MUSIXMATCH · CYANITE · SONGSTATS".
+  const partnersLine = song.partnersUsed.join(" · ");
+  const hasFooter = notes.length > 0 || partnersLine.length > 0;
+
   const renderView = () => {
     switch (view) {
       case "cast":
@@ -331,12 +335,17 @@ export function HudFrame({ children, activeMetric }: HudFrameProps) {
           })}
         </div>
 
-        {/* Bottom-right: provenance qualifiers (live data only). */}
-        {notes.length > 0 ? (
+        {/* Bottom-right: provenance qualifiers + data-partner line. */}
+        {hasFooter ? (
           <div className="flex flex-col items-end gap-0.5 text-right font-mono text-[10px] uppercase tracking-[0.12em] text-text-faint">
             {notes.map((note) => (
               <span key={note}>{note}</span>
             ))}
+            {partnersLine && (
+              <span className="tracking-[0.16em] text-text-dim">
+                {partnersLine}
+              </span>
+            )}
             {song.copyright && (
               <span className="max-w-[16rem] truncate normal-case tracking-normal text-text-faint/70">
                 {song.copyright}

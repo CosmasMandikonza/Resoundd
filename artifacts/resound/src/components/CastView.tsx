@@ -27,6 +27,7 @@ export function CastView() {
   } = useResound();
 
   const { lines, fingerprint, durationMs, previewUrl, overallFidelity } = song;
+  const emotionSource = song.emotionSource;
   const durationSec = durationMs / 1000;
 
   // Two derived market fidelities so the flanking spheres visibly differ.
@@ -204,6 +205,7 @@ export function CastView() {
             currentLine={currentLine}
             accent={accent}
             drained={drained}
+            emotionSource={emotionSource}
           />
         ) : (
           <p className="font-mono text-xs uppercase tracking-[0.16em] text-text-faint">

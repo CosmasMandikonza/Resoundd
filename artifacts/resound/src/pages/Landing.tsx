@@ -6,7 +6,6 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { SplitText } from "gsap/SplitText";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useResound } from "@/context/useResound";
-import { FEATURED } from "@/fixtures/featured";
 import ColorField from "@/components/landing/ColorField";
 import KineticBorder from "@/components/landing/KineticBorder";
 
@@ -141,9 +140,9 @@ const PILLARS: { key: string; title: string; body: string; accent: string }[] =
   ];
 
 export function Landing() {
-  const { startAnalysis, openFeatured } = useResound();
+  const { startAnalysis, openFeatured, featured } = useResound();
   const auth = useAuth();
-  const firstFeaturedId = FEATURED[0]?.id;
+  const firstFeaturedId = featured[0]?.id;
   const rootRef = useRef<HTMLDivElement>(null);
 
   const onFeatured = () => {
@@ -378,7 +377,7 @@ export function Landing() {
             A song, already carried across.
           </h2>
           <div className="grid grid-cols-1 gap-px sm:grid-cols-2 lg:grid-cols-3">
-            {FEATURED.map((f, i) => {
+            {featured.map((f, i) => {
               const accent = FEATURED_ACCENTS[i % FEATURED_ACCENTS.length];
               return (
                 <button

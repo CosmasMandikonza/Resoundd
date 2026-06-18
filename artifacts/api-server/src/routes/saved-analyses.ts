@@ -8,6 +8,11 @@ import {
 } from "@workspace/shared-types";
 import { db, savedAnalysesTable } from "@workspace/db";
 import { fetchTrackById, fetchLyrics } from "../lib/analyze/musixmatch";
+import {
+  mergeSource,
+  stripSource,
+  trackIdFromSong,
+} from "../lib/analyze/song-persistence";
 
 const router: IRouter = Router();
 
@@ -25,46 +30,6 @@ function requireUserId(req: Request, res: Response): string | null {
   };
   res.status(401).json(body);
   return null;
-}
-
-/**
- * Recover the Musixmatch track id from the assembled song id
- * (`song-<trackId>-<targetLang>`). Used only as the stable persistence key.
- */
-function trackIdFromSong(song: Song): string {
-  const suffix = `-${song.targetLang}`;
-  if (song.id.startsWith("song-") && song.id.endsWith(suffix)) {
-    return song.id.slice("song-".length, song.id.length - suffix.length);
-  }
-  return song.id;
-}
-
-/**
- * Strip the raw source lyric from every line before persistence. We keep only
- * the derived layer (translation, localized, scores); the original lyric text
- * is re-fetched live on reopen.
- */
-function stripSource(song: Song): Song {
-  return {
-    ...song,
-    lines: song.lines.map((line) => ({ ...line, source: "" })),
-  };
-}
-
-/** Merge live-fetched raw lyric text back into the derived song by line index. */
-function mergeSource(
-  song: Song,
-  raw: { text: string }[],
-): Song {
-  return {
-    ...song,
-    lines: song.lines.map((line, i) => {
-      const match = /^line-(\d+)$/.exec(line.id);
-      const idx = match ? Number(match[1]) : i;
-      const text = raw[idx]?.text ?? raw[i]?.text ?? line.source;
-      return { ...line, source: text };
-    }),
-  };
 }
 
 function toSummary(row: {

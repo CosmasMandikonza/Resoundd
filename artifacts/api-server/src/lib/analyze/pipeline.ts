@@ -14,6 +14,8 @@ import { findPreview } from "./itunes";
 import { analyzeWithLlm, type LlmAnalysis } from "./llm";
 import { computeDrift } from "./embeddings";
 import { buildFingerprint, buildMarkets } from "./fingerprint";
+import { applySongstats, fetchSongstats, isSongstatsEnabled } from "./songstats";
+import { runCyaniteAnalysis } from "./cyanite";
 
 const f01 = (n: number): number => Math.round(n) / 100;
 
@@ -137,10 +139,21 @@ export interface AnalyzeResult {
   cached: boolean;
 }
 
-/** Full analysis pipeline: resolve -> lyrics -> (preview ‖ LLM) -> drift -> assemble. */
+export interface AnalyzeOptions {
+  /**
+   * When true, run the (slow) Cyanite audio-emotion analysis inline and swap its
+   * arc into the result before returning — used by /api/precompute so featured
+   * songs ship complete. The default live path returns the lyric arc immediately
+   * and lets the client enrich via /api/enrich/cyanite.
+   */
+  waitForCyanite?: boolean;
+}
+
+/** Full analysis pipeline: resolve -> lyrics -> (preview ‖ LLM ‖ Songstats) -> drift -> assemble. */
 export async function analyzeSong(
   input: AnalyzeInput,
   log: Logger,
+  options: AnalyzeOptions = {},
 ): Promise<AnalyzeResult> {
   const track = await resolveTrack({
     title: input.title,
@@ -154,7 +167,10 @@ export async function analyzeSong(
 
   const key = cacheKey(track.trackId, input.targetLang);
   const hit = getCached(key);
-  if (hit) {
+  // When precompute asks for the slow Cyanite enrichment, only honor a cached
+  // entry that is itself already Cyanite-enriched — otherwise we'd ship a
+  // lyric-arc featured song and silently skip audio analysis.
+  if (hit && (!options.waitForCyanite || hit.emotionSource === "cyanite")) {
     log.info({ key }, "cache hit");
     return { song: hit, cached: true };
   }
@@ -166,8 +182,9 @@ export async function analyzeSong(
     "fetched lyrics",
   );
 
-  // iTunes preview lookup runs alongside the LLM analysis (independent work).
-  const [preview, analysis] = await Promise.all([
+  // iTunes preview, the LLM analysis, and the Songstats market lookup are all
+  // independent of each other, so run them concurrently. Songstats is best-effort.
+  const [preview, analysis, songstats] = await Promise.all([
     findPreview(track.trackName, track.artistName),
     analyzeWithLlm({
       lines: lyrics.lines,
@@ -175,6 +192,10 @@ export async function analyzeSong(
       title: track.trackName,
       artist: track.artistName,
     }),
+    fetchSongstats(
+      { title: track.trackName, artist: track.artistName },
+      log,
+    ),
   ]);
 
   // Order analyzed lines by the model's declared index first, so every
@@ -209,7 +230,14 @@ export async function analyzeSong(
     { ...analysis, lines: ordered },
     timings.map((t) => t.norm),
   );
-  const markets = buildMarkets(analysis);
+  const baseMarkets = buildMarkets(analysis);
+  const { markets, applied: songstatsApplied } = songstats
+    ? applySongstats(baseMarkets, songstats)
+    : { markets: baseMarkets, applied: false };
+  const marketDataSource = songstatsApplied ? "songstats" : "estimated";
+
+  const partnersUsed = ["MUSIXMATCH"];
+  if (songstatsApplied) partnersUsed.push("SONGSTATS");
 
   const topMarket =
     [...markets].sort((a, b) => b.readiness - a.readiness)[0]?.name ??
@@ -239,9 +267,34 @@ export async function analyzeSong(
     markets,
     timingLevel: lyrics.timingLevel,
     translationSource: "generated",
+    emotionSource: "lyric",
+    marketDataSource,
+    partnersUsed,
     ...(lyrics.restricted ? { lyricsRestricted: true } : {}),
     ...(lyrics.copyright ? { copyright: lyrics.copyright } : {}),
   };
+
+  // For precompute/featured we wait for the slow Cyanite audio analysis so the
+  // shipped song already carries the real emotional arc. The live path skips
+  // this and lets the client enrich asynchronously.
+  if (options.waitForCyanite && song.previewUrl) {
+    const cyanite = await runCyaniteAnalysis(
+      song.previewUrl,
+      String(track.trackId),
+      log,
+    );
+    if (cyanite) {
+      song.fingerprint = {
+        ...song.fingerprint,
+        sourceArc: cyanite.sourceArc,
+      };
+      song.emotionSource = "cyanite";
+      song.cyaniteSummary = cyanite.summary;
+      if (!song.partnersUsed.includes("CYANITE")) {
+        song.partnersUsed.push("CYANITE");
+      }
+    }
+  }
 
   const validated = SongSchema.safeParse(song);
   if (!validated.success) {
@@ -254,3 +307,17 @@ export async function analyzeSong(
   setCached(key, validated.data);
   return { song: validated.data, cached: false };
 }
+
+/**
+ * Like {@link analyzeSong} but advertises CYANITE as an intended partner up
+ * front and always waits for the audio analysis. Used by /api/precompute so
+ * featured songs are fully enriched before they are persisted.
+ */
+export async function analyzeSongForFeatured(
+  input: AnalyzeInput,
+  log: Logger,
+): Promise<AnalyzeResult> {
+  return analyzeSong(input, log, { waitForCyanite: true });
+}
+
+export { isSongstatsEnabled };

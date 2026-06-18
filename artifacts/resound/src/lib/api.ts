@@ -1,8 +1,10 @@
 import {
   SongSchema,
   SavedAnalysisSummarySchema,
+  CyaniteEnrichResultSchema,
   type AnalyzeInput,
   type AnalyzeErrorBody,
+  type CyaniteEnrichResult,
   type SavedAnalysisSummary,
   type Song,
 } from "@/types";
@@ -63,6 +65,74 @@ export async function analyzeSong(
     );
   }
   return parsed.data;
+}
+
+const ENRICH_ENDPOINT = `${import.meta.env.BASE_URL}api/enrich/cyanite`;
+
+/**
+ * Ask the server to run the slow Cyanite audio-emotion analysis for a track.
+ * Best-effort: any failure (network, server, disabled) resolves to a silent
+ * lyric fallback (`{ emotionSource: "lyric" }`) so the caller keeps the arc it
+ * already has. Never throws.
+ */
+export async function enrichCyanite(input: {
+  trackId: string;
+  previewUrl: string;
+  targetLang?: string;
+  signal?: AbortSignal;
+}): Promise<CyaniteEnrichResult> {
+  const fallback: CyaniteEnrichResult = { emotionSource: "lyric" };
+  try {
+    const res = await fetch(ENRICH_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        trackId: input.trackId,
+        previewUrl: input.previewUrl,
+        ...(input.targetLang ? { targetLang: input.targetLang } : {}),
+      }),
+      signal: input.signal,
+    });
+    if (!res.ok) return fallback;
+    const parsed = CyaniteEnrichResultSchema.safeParse(await res.json());
+    return parsed.success ? parsed.data : fallback;
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") throw err;
+    return fallback;
+  }
+}
+
+const FEATURED_ENDPOINT = `${import.meta.env.BASE_URL}api/featured`;
+
+/** A featured gallery entry (precomputed, fully enriched). */
+export interface FeaturedItem {
+  id: string;
+  song: Song;
+}
+
+/**
+ * Fetch the public featured gallery. Returns an empty array on any failure so
+ * the caller can fall back to the built-in fixture.
+ */
+export async function listFeatured(): Promise<FeaturedItem[]> {
+  try {
+    const res = await fetch(FEATURED_ENDPOINT);
+    if (!res.ok) return [];
+    const json = (await res.json()) as { items?: unknown };
+    if (!Array.isArray(json.items)) return [];
+    const items: FeaturedItem[] = [];
+    for (const raw of json.items) {
+      if (typeof raw !== "object" || raw === null) continue;
+      const { id, song } = raw as { id?: unknown; song?: unknown };
+      const parsed = SongSchema.safeParse(song);
+      if (typeof id === "string" && parsed.success) {
+        items.push({ id, song: parsed.data });
+      }
+    }
+    return items;
+  } catch {
+    return [];
+  }
 }
 
 /** A typed failure thrown by the saved-analyses calls. */

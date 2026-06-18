@@ -41,9 +41,57 @@ function arcPath(o: Market, m: Market): string {
   return `M ${o.x} ${o.y} Q ${cx.toFixed(1)} ${cy.toFixed(1)} ${m.x} ${m.y}`;
 }
 
+/** Compact human-readable stream count (e.g. 1.2M, 940K). */
+function formatStreams(n: number): string {
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
+  return String(Math.round(n));
+}
+
+const SPARK_W = 280;
+const SPARK_H = 44;
+
+/** A minimal streams-history sparkline (Songstats data). */
+function Sparkline({ values, color }: { values: number[]; color: string }) {
+  if (values.length < 2) return null;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = max - min || 1;
+  const pts = values.map((v, i) => {
+    const x = (i / (values.length - 1)) * SPARK_W;
+    const y = SPARK_H - ((v - min) / span) * (SPARK_H - 4) - 2;
+    return [x, y] as const;
+  });
+  const lineD = pts
+    .map(([x, y], i) => `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`)
+    .join(" ");
+  const areaD = `${lineD} L ${SPARK_W} ${SPARK_H} L 0 ${SPARK_H} Z`;
+  return (
+    <svg
+      width="100%"
+      viewBox={`0 0 ${SPARK_W} ${SPARK_H}`}
+      preserveAspectRatio="none"
+      className="mt-2"
+      aria-hidden
+    >
+      <path d={areaD} fill={withAlpha(color, 0.12)} />
+      <path
+        d={lineD}
+        fill="none"
+        stroke={color}
+        strokeWidth={1.5}
+        vectorEffect="non-scaling-stroke"
+      />
+      <circle cx={pts[pts.length - 1][0]} cy={pts[pts.length - 1][1]} r={2.4} fill={color} />
+    </svg>
+  );
+}
+
 export function WorldView() {
   const { setView, song } = useResound();
   const { title, markets } = song;
+  const marketDataSource = song.marketDataSource;
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [shown, setShown] = useState<Market | null>(null);
@@ -130,9 +178,15 @@ export function WorldView() {
             {title}
           </span>
         </div>
-        <p className="mt-3 font-mono text-xs uppercase tracking-[0.22em] text-text-dim">
-          Readiness by Market
-        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs uppercase tracking-[0.22em] text-text-dim">
+          <span>Readiness by Market</span>
+          <span className="text-text-faint">·</span>
+          <span className="tracking-[0.16em] text-text-faint">
+            {marketDataSource === "songstats"
+              ? "Streams · Songstats"
+              : "Streams · Estimated"}
+          </span>
+        </div>
       </header>
 
       {/* OPPORTUNITY CALLOUT — the money insight. */}
@@ -378,6 +432,34 @@ export function WorldView() {
                 Streams <span style={{ color: "var(--joy)" }}>▲</span>{" "}
                 <span className="text-text">{shown.streamsDelta}%</span> / 30D
               </p>
+
+              {/* Absolute streams + history sparkline (Songstats). */}
+              {(shown.absoluteStreams != null ||
+                (shown.streamsHistory?.length ?? 0) >= 2) && (
+                <div className="mt-4">
+                  <div className="flex items-baseline justify-between">
+                    <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-text-faint">
+                      Total Streams
+                    </span>
+                    {shown.absoluteStreams != null && (
+                      <span className="font-mono text-sm text-text">
+                        {formatStreams(shown.absoluteStreams)}
+                      </span>
+                    )}
+                  </div>
+                  {(shown.streamsHistory?.length ?? 0) >= 2 && (
+                    <Sparkline
+                      values={shown.streamsHistory ?? []}
+                      color={nodeColor(shown.readiness)}
+                    />
+                  )}
+                  <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.16em] text-text-faint">
+                    {marketDataSource === "songstats"
+                      ? "Source · Songstats"
+                      : "Source · Estimated"}
+                  </p>
+                </div>
+              )}
 
               {/* Fidelity sub-scores as mini bars. */}
               <div className="mt-5 flex flex-col gap-3">
